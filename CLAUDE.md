@@ -87,9 +87,9 @@ automatic fix runs, claude.ai/code sessions and local sessions.
    the date) under "Learned rules" in `docs/REVIEW-CHECKLIST.md`, as part of the same PR.
 
 ## Editing rule files on a PR run
-On runs triggered from a PR, the action replaces `CLAUDE.md` and `.claude/` in the working tree with `main`'s
-versions. The PR's own versions are kept under `.claude-pr/` for reference. So when a PR run must change these
-files:
+On runs tied to a PR (`@claude` on a PR, or a pull request event), the action replaces `CLAUDE.md` and `.claude/` in
+the working tree with `main`'s versions. The PR's own versions are kept under `.claude-pr/` for reference.
+If `.claude-pr/` exists and the run must change these files:
 - Start from the `.claude-pr/` copy, not the working-tree copy, or you'll undo the PR's earlier changes.
 - Stage files by name. Never use `git add -A` or `git add .`.
 - Never commit `.claude-pr/`.

@@ -49,6 +49,10 @@ Notes:
 - To check in step 7: can a claude.ai/code session push a change under `.github/workflows/`? Until then,
   pipeline changes are local-only.
 - To check in step 7: when a claude.ai/code session opens a PR, is the PR author the owner or the Claude app?
-  The reviewer's "owner-only" guard (D16) must allow whichever it is.
+  The reviewer's "owner-only" guard (D16) must allow whichever it is. If the author is the Claude app (a bot),
+  the action treats the PR as coming from a non-write author and blocks npm and test runners on it, so `@claude`
+  and fix runs couldn't run checks there. In that case, sessions should push the branch and let the owner open the PR.
+- To decide in step 6b: how fix runs start. If not tied to the PR (e.g. `workflow_dispatch`), there's no
+  `.claude-pr/` restore; check `CLAUDE.md`'s "Editing rule files" section still fits.
 - To do in step 6a: make the test job a required status check on `main`, then enforce the rules for admins too
   (left off for now so setup can bootstrap).
