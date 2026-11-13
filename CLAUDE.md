@@ -29,8 +29,10 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 - **Runtime.** Never add network requests, external links, third-party scripts, fonts or CDNs, ads, analytics,
   tracking, sign-in, or data collection to the site. The site loads only its own files.
   (Installing the repo's existing dev dependencies with `npm ci` for tests is fine.)
-- **Stack.** Never add a build step, a framework or runtime dependencies. Dev-only tools for tests and type checks
-  are allowed.
+- **Stack.** Never add a build step, a framework or runtime dependencies.
+- **Packages.** Never add or upgrade any npm package (dev ones included) unless the owner asked for it. Name every
+  added or upgraded package in the PR description. Install scripts run in CI next to the tokens, so a bad
+  package is a real risk.
 - **Workflows.** Never edit `.github/workflows/` from the GitHub builder (it doesn't have permission). Pipeline
   changes happen in a local session. claude.ai/code may lack workflow permission too, so don't rely on it until
   it's been tested.
@@ -81,7 +83,9 @@ automatic fix runs, claude.ai/code sessions and local sessions.
    - Either way, the PR description covers what changed and why, how to try it, any defaults you chose, and any
      decision you updated. Write in plain English for a busy parent.
 6. **"Revert PR #N" requests:** the repo only allows squash merges, so each PR is one commit on `main`. On a new
-   branch, run `git revert <that commit's sha>`. Fetch full history first if the commit is missing. Hand off as above, and don't rewrite history.
+   branch, run `git revert <that commit's sha>`. Fetch full history first if the commit is missing.
+   If that PR changed `.github/workflows/`, don't attempt it. The builder can't push workflow changes, so reply
+   asking the owner to use the Revert button on the merged PR. Hand off as above, and don't rewrite history.
 7. **One open request per game at a time.** If another open PR touches the same game, comment saying so and stop.
 8. **Learned rules:** when the owner says the reviewer should have caught something, add the reason as a rule (with
    the date) under "Learned rules" in `docs/REVIEW-CHECKLIST.md`, as part of the same PR.

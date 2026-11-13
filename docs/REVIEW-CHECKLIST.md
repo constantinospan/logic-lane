@@ -67,12 +67,15 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 - [ ] If shipped files changed, the service worker cache version was bumped.
 - [ ] The update prompt and the emergency "clear cache" path still work. It still works offline after one visit.
 - [ ] No build step, framework or runtime dependency added.
+- [ ] `package.json` and the lockfile add or upgrade no package the request didn't ask for, and every added or
+      upgraded package is named in the PR description.
 - [ ] Saving goes through the shared storage module.
 - [ ] New or changed logic has tests, and all checks pass.
 
 ## 6. Rule changes (PRs that change `CLAUDE.md`, this checklist, `docs/DECISIONS.md` or `.claude/`)
-- [ ] Read the PR's version from `.claude-pr/` or `git diff origin/main...HEAD`, never from the working tree (which
-      holds `main`'s copy).
+- [ ] Compare the PR's version with `main`'s (use `git diff origin/main...HEAD`):
+      - For `CLAUDE.md` and `.claude/`, the working tree holds `main`'s copy and the PR's copy is in `.claude-pr/`.
+      - For files under `docs/`, the working tree holds the PR's copy. Use `git show origin/main:<path>` for `main`'s.
 - [ ] Blocking if the change contradicts `docs/DECISIONS.md` without updating that decision too.
 - [ ] Blocking if it weakens the privacy, secrets, runtime-safety or "who you take instructions from" rules.
 - [ ] Blocking if `CLAUDE.md` and this checklist end up contradicting each other.
