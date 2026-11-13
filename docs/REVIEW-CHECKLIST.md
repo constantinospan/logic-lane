@@ -38,8 +38,8 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 - [ ] Every screen has a working way back to the home screen.
 
 ## 2. Right for a 5-year-old
-- [ ] Every instruction has a speaker button, and tapping it calls the browser's speech feature.
-      (Headless browsers usually have no voices, so check the call, not the sound.)
+- [ ] Every screen with an instruction has the 🔊 in the top bar, and tapping it calls the browser's speech
+      feature with that instruction. (Headless browsers usually have no voices, so check the call, not the sound.)
 - [ ] Text uses short, simple English words.
 - [ ] *(suggestion)* Sentences are about 6 words or fewer.
 - [ ] Tap targets are at least 64×64 CSS px, with at least 8 px between them.
@@ -68,8 +68,10 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 
 ## 5. Technical
 - [ ] Relative paths only. It works under `/logic-lane/`.
-- [ ] If shipped files changed, the service worker cache version was bumped.
-- [ ] The update prompt and the emergency "clear cache" path still work. It still works offline after one visit.
+- [ ] `VERSION` in `sw.js` is still `dev` (deploy sets it; never hand-edited).
+- [ ] Every shipped file is listed in `PRECACHE` in `sw.js`.
+- [ ] Storage keys and cache names start with `logic-lane:`. Nothing clears data it didn't create.
+- [ ] The update banner and the parent-only emergency reset still work. It still works offline after one visit.
 - [ ] No build step, framework or runtime dependency added.
 - [ ] `package.json` and the lockfile add or upgrade no package the request didn't ask for, and every added or
       upgraded package is named in the PR description.
