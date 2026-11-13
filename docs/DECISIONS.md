@@ -61,7 +61,12 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
 - Every visit is a new start. No profiles, no saved progress between visits.
 - Current game state is kept in localStorage with a timestamp. If she comes back within the resume window,
   the game resumes where it was (survives refresh, app swiped away, tablet killing the app); after it, fresh start.
-- Resume window: 3 hours (one setting, easy to change).
+- Resume window: 3 hours from the last save (one setting, easy to change). Saves also happen when the app is
+  hidden or closed.
+- An installed app always opens at its start page, so on startup, a fresh save from the play screen goes straight
+  back into that game. Pressing 🏠 keeps the save for a "Continue" button on that game's picker, but doesn't
+  auto-resume on the next start.
+- One resume slot: starting a different game replaces it.
 - sessionStorage was rejected: lost when an installed app is closed or killed in the background.
 - GitHub Pages is static and cannot write files; writing to the repo from the page would expose a token. Rejected.
 - External backends (Supabase/Firebase/Cloudflare) rejected for now to avoid external services.
@@ -69,7 +74,8 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
   without touching the games.
 
 ### D8. Plain JavaScript (ES modules), no build step
-- Shipped files = repo files. No framework.
+- Shipped files = repo files. No framework. One exception: the deploy job writes `VERSION` in `sw.js` (D16), and
+  nothing else.
 - Type checking via JSDoc comments checked by TypeScript in CI (no compilation).
 - Dev tooling only for checks: unit tests (Vitest), browser tests (Playwright, phone + tablet + desktop sizes). Runs in CI before deploy.
 - Rejected: Vite+TypeScript, Svelte (build step not worth it at this size), game engines (too heavy for grid puzzles).
@@ -82,8 +88,9 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
 ### D10. Language and reading level
 - English only. Child (5yo) reads simple, easy English words.
 - Icons and pictures first; any text is short, simple words.
-- Every instruction has a speaker button that reads it aloud (browser built-in speech, no audio files).
-  The button is always there; using it is optional for her.
+- One 🔊 speaker button in the top bar reads the current instruction aloud (browser built-in speech, no audio
+  files). It costs no extra space on small screens; using it is optional for her. Games can change what it reads,
+  e.g. to a hint. (Owner chose this over one button per instruction, 2026-11-13.)
 
 ### D11. Home screen
 Big game tiles, tap to play. No profiles, no long-term progress shown.
@@ -93,7 +100,9 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Layout / positions / answers are random each time, so replaying never repeats the same puzzle.
 - Every generated puzzle must be solvable: generate the solution first, then build around it; verify with a solver.
 - Seeded randomness: the seed is saved with the game state (D7), so resuming restores the same puzzle, and can be used
-  to reproduce a puzzle for bug fixes.
+  to reproduce a puzzle for bug fixes. Seeds are 6 characters (e.g. `k3x9q2`). A long-press on the level
+  indicator shows `level · seed` for 5 seconds, for bug reports.
+- Each game has a `version`, which is bumped when its generator changes. Saves from an older version are dropped.
 - Tests generate many puzzles per difficulty and assert solvable + within difficulty bounds.
 
 ### D13. Game backlog
@@ -131,7 +140,15 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Only the owner can trigger the builder (write access required; no collaborators; bots blocked).
 - Fork PRs: review workflow runs only when PR author is the owner; repo setting requires approval for all
   outside contributors' workflow runs. Never use `pull_request_target`. Forks don't get repo secrets.
-- PWA cache is versioned per deploy; update prompt is tested; an emergency "clear cache" path exists.
+- PWA cache version = a hash of the shipped files, written into `sw.js` `VERSION` by the deploy job (6a). It's
+  `dev` in the repo. Never edit it by hand. A docs-only change keeps the same hash (no update prompt), and a
+  revert gets a new one.
+- Every shipped file is listed in `PRECACHE` in `sw.js`, which a test checks.
+- All this account's `*.github.io` sites share one origin, so every storage key and cache name is prefixed
+  `logic-lane:`. Nothing clears storage or caches it didn't create.
+- The "⬆️ New!" banner updates the app (resume brings her back to the same puzzle).
+- Emergency reset is parent-only: hold the home title for 3 s, then hold "Reset" for 3 s. It works online only,
+  clears only `logic-lane:` data and caches, and reloads.
 - Site lives under `/logic-lane/`: relative paths only; tests run under the same base path.
 - Max OAuth token expires (~1 year): renewal reminder in README; failures are loud.
 - Quota exhausted → run fails; re-run later.

@@ -41,18 +41,21 @@ automatic fix runs, claude.ai/code sessions and local sessions.
   messages.
 
 ## Tech rules (D8, D9, D16)
-- Plain JavaScript ES modules, HTML and CSS. Shipped files are the repo files. No compile step.
+- Plain JavaScript ES modules, HTML and CSS. Shipped files are the repo files (the one exception: deploy writes
+  `VERSION` in `sw.js`). No compile step. How games plug in: `docs/GAME-API.md`.
 - Types are JSDoc comments, checked by TypeScript in CI (`checkJs`). Add JSDoc types to new functions.
 - **Relative paths only.** The site is served from `/logic-lane/`, not the domain root.
 - Rendering: HTML/SVG + CSS animations. Input: pointer events only, so touch and mouse share one code path.
-- Installable app (PWA): when you change any shipped file, bump the cache version in the service worker so devices
-  get the "new version available" prompt. Keep the update prompt and the emergency "clear cache" path working.
-- All saving goes through the shared storage module. Games never call `localStorage` directly.
+- Installable app (PWA): never edit `VERSION` in `sw.js` by hand, because deploy sets it. Add every new shipped file
+  to `PRECACHE` in `sw.js`. Keep the update banner and the parent-only emergency reset working.
+- All saving goes through `js/core/storage.js`. Games use `api.saveState`, never `localStorage`.
+- All storage keys and cache names start with `logic-lane:` (the origin is shared with other sites). Never clear
+  storage or caches you didn't create.
 
 ## Game design rules
 - **Audience:** a 5-year-old who reads simple English words. Pictures and icons first; any text is a few short,
-  simple words. Every instruction has a speaker button that reads it aloud (browser speech, no audio files).
-  The button is always there; using it is up to her.
+  simple words. The one 🔊 button in the top bar reads the current instruction aloud (browser speech, no audio
+  files). Games set what it reads with `api.setInstruction`.
 - **Tap targets:** at least 64×64 CSS px with clear spacing. Must work one-handed on a phone.
 - **Kind feedback:** celebrate success. A mistake gets a gentle hint and an easy retry, never a "game over",
   a harsh sound or a lost level. No timers or time pressure unless the owner asks for them.

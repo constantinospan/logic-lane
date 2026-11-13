@@ -33,8 +33,8 @@ What happens next:
      `docs/DECISIONS.md`, `.claude/`), which always are. Read those yourself before merging too.
 3. You look at the verdict and screenshots, then **Merge**. Or comment `@claude` on the PR with what to change,
    and it updates the same PR.
-4. Merging publishes the change to the live site within a few minutes. Installed apps show a
-   **"new version available"** prompt next time they're opened.
+4. Merging publishes the change to the live site within a few minutes. Installed apps show a **⬆️ New!** button
+   when they're next opened. Tapping it updates, and she carries on from the same puzzle.
 
 Only the repo owner can trigger Claude. Other people's issues or comments can't start it.
 
@@ -43,6 +43,13 @@ Only the repo owner can trigger Claude. Other people's issues or comments can't 
   **Revert**, then **Create pull request**, then merge it.
 - **Or from anywhere:** open a new issue saying `@claude revert PR #N` (with the PR's number).
   This can't revert a PR that changed the pipeline (`.github/workflows/`). For those, use the Revert button.
+
+## If the app gets stuck
+On the home screen, hold the **Logic Lane** title for 3 seconds, then hold **Reset** for 3 seconds. It needs
+internet. It clears only Logic Lane's own data and reloads.
+
+To report a puzzle that looks wrong: long-press the level number at the top. It shows something like `12 · k3x9q2`.
+Put that in the issue so Claude can recreate the exact puzzle.
 
 ## Maintenance
 - **Claude token:** the `CLAUDE_CODE_OAUTH_TOKEN` repo secret comes from the owner's personal Claude Max plan and expires

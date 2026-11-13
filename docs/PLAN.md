@@ -8,7 +8,7 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 1 ✅ | Repo | Create public GitHub repo, push docs, enable Pages (Actions source), protect `main`, require approval for outside contributors' workflows | Both | 10 min | 15 min |
 | 2 ✅ | AI access | Install Claude GitHub App on the repo, run `claude setup-token`, store it as a repo secret | Me (Claude guides) | 10 min | — |
 | 3 ✅ | Rulebook | `CLAUDE.md` (agent rules), `REVIEW-CHECKLIST.md`, `README.md` (rollback, token renewal) | Claude, you approve | 10 min read | 30 min |
-| 4 | Shared base | Home screen, difficulty picker, refresh protection (localStorage, 3 h resume window), seeded random, installable app, styles | Claude | — | 2–3 h |
+| 4 ✅ | Shared base | Home screen, difficulty picker, refresh protection (localStorage, 3 h resume window), seeded random, installable app, styles | Claude | — | 2–3 h |
 | 5 | Tests | Unit tests, browser tests at phone, tablet + desktop sizes, type checking | Claude | — | 1 h |
 | 6a | Core pipeline | Tests gate + deploy, builder (`@claude`), fork guards. A working request → PR → merge → live loop | Claude | — | 1–1.5 h |
 | 7 | Dry run | You open a small test issue from your phone, watch it go to PR → merge → live | Both | 30 min | 30 min |
@@ -35,13 +35,16 @@ Notes:
   and install Playwright browsers in the job, so it can run checks before pushing.
 - To do in step 6a: allow `Bash(git revert:*)` for the builder (via `claude_args: --allowedTools`) and check out with `fetch-depth: 0`, so
   "`@claude` revert PR #N" works. Test it in the step 7 dry run.
-- To decide in step 4: where you can see a puzzle's seed for bug reports (e.g. small text on a long-press of the
-  level number), without distracting her.
-- To decide in step 4: how the service worker cache version changes. Either a manual bump in each PR (can
-  conflict between parallel PRs) or the deploy job stamps the commit SHA in. Record the choice in D16 and align
-  `CLAUDE.md` and the checklist. Whichever is chosen, a `git revert` must still end with a newer cache version
-  (a SHA stamp does this automatically; a manual bump means adding "then bump the cache version" to `CLAUDE.md`
-  step 6).
+- Step 4 done: shared base, hidden demo game (`#/play/demo`), `docs/GAME-API.md`. Decided: one 🔊 in the top bar
+  (D10), seed on long-press (D12), content-hash cache version stamped by deploy (D8, D16), parent-only reset (D16).
+- To do in step 5: Vitest for `js/core/*` and the demo generator. Playwright at phone, tablet and desktop for the
+  flows (home → picker → play, resume after reopening, celebration, Home then Continue, offline reset guard).
+  A test that `PRECACHE` lists exactly the shipped files. A test of the update banner (serve a changed `sw.js`
+  via `page.route`). `tsc` `checkJs`, with a separate config for `sw.js` (webworker lib).
+- To do in step 6a: the deploy job writes a hash of the shipped files into `VERSION` in `sw.js` (only that line).
+- Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.
+- Check in step 9 on the real iPad: the 3 s holds (home title, Reset) and the seed long-press aren't cancelled by
+  iOS (only tested in Chrome so far).
 - To do in step 6a: set `include_comments_by_actor: constantinospan`, so Claude only reads the owner's comments
   (D15). Until then, the README's "anyone else's comments are ignored" only covers triggering.
 - To do in step 6b: the reviewer and fix runs load `CLAUDE.md` and `docs/REVIEW-CHECKLIST.md` from `main`
