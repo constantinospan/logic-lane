@@ -22,20 +22,21 @@ Use whichever is handy. All three end in a pull request (PR) for you to merge.
 | A local Claude Code session | Open this folder and describe what you want. |
 
 ⚠️ **Issues and comments are public.** Never write her name or other personal details in them.
+⚠️ **Only use `@claude` on issues you wrote yourself.** Claude reads the whole issue, including anyone else's text.
 
 What happens next:
 1. Claude builds it on a branch and runs the tests. On GitHub it posts a **Create PR** link: tap it.
 2. Tests run on the PR. If they pass, the AI reviewer plays the game and posts a ✅/❌ verdict with screenshots.
    On ❌ it tries to fix things itself, up to 2 rounds, then labels the PR `needs-you`.
    - If the **tests** fail, there's no review. Comment `@claude fix the failing tests`.
-   - PRs that only change docs aren't reviewed, except changes to the agent rules (`CLAUDE.md`, the checklist),
+   - PRs that only change docs aren't reviewed, except changes to the agent rules (`CLAUDE.md`, the checklist, `docs/DECISIONS.md`, `.claude/`),
      which always are. Read those yourself before merging too.
 3. You look at the verdict and screenshots, then **Merge**. Or comment `@claude` on the PR with what to change,
    and it updates the same PR.
 4. Merging publishes the change to the live site within a few minutes. Installed apps show a
    **"new version available"** prompt next time they're opened.
 
-Only the repo owner can trigger Claude. Anyone else's issues or comments are ignored.
+Only the repo owner can trigger Claude. Other people's issues or comments can't start it.
 
 ## Something broke: rolling back
 - **On github.com in a browser** (the button isn't in the GitHub phone app): open the merged PR that caused it, tap

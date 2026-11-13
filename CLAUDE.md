@@ -64,7 +64,7 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 
 ## How to work on a request
 1. Read the request and the related decisions. If it's ambiguous in a way that changes what you'd build,
-   ask one short question in the issue and stop. For small gaps, pick a sensible default and state it in the PR.
+   ask one short question (in the issue, or in the session) and stop. For small gaps, pick a sensible default and state it in the PR.
 2. **Branch:**
    - A request on an issue gets a new branch.
    - `@claude` on an open PR means pushing to that PR's branch.
@@ -79,10 +79,8 @@ automatic fix runs, claude.ai/code sessions and local sessions.
    - Sessions open the PR if they can; otherwise they give the owner the link to create it.
    - Either way, the PR description covers what changed and why, how to try it, any defaults you chose, and any
      decision you updated. Write in plain English for a busy parent.
-6. **"Revert PR #N" requests:** on a new branch, revert that PR's commit.
-   - For a merge commit, use `git revert -m 1 <merge sha>`.
-   - For a squash merge, use `git revert <sha>`.
-   Fetch full history first if the commit is missing. Hand off as above, and don't rewrite history.
+6. **"Revert PR #N" requests:** the repo only allows squash merges, so each PR is one commit on `main`. On a new
+   branch, run `git revert <that commit's sha>`. Fetch full history first if the commit is missing. Hand off as above, and don't rewrite history.
 7. **One open request per game at a time.** If another open PR touches the same game, comment saying so and stop.
 8. **Learned rules:** when the owner says the reviewer should have caught something, add the reason as a rule (with
    the date) under "Learned rules" in `docs/REVIEW-CHECKLIST.md`, as part of the same PR.

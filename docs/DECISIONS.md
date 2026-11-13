@@ -120,9 +120,10 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Public-repo hygiene: keep `show_full_output` off (logs are public); limit comments Claude reads to the owner
   (`include_comments_by_actor`); only `@claude` on the owner's own issues.
 - Branch protection on `main`: tests must pass before merge.
+- Squash merges only (merge commits and rebase merging are off): one commit per PR, so reverting is always one step.
 - Reviewer is a separate run with a strict, critical prompt and checklist; the parent is the final judge.
 - Quota: runs share the owner's Max limits. Reviewer runs only after tests pass; skip it for docs-only changes.
-  `CLAUDE.md`, `docs/REVIEW-CHECKLIST.md` and `.claude/` never count as docs-only: they're always reviewed.
+  `CLAUDE.md`, `docs/REVIEW-CHECKLIST.md`, `docs/DECISIONS.md` and `.claude/` never count as docs-only: they're always reviewed.
 
 ### D16. Second review round
 - Only the owner can trigger the builder (write access required; no collaborators; bots blocked).
