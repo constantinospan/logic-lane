@@ -38,6 +38,11 @@ Notes:
 - To decide in step 4: how the service worker cache version changes. Either a manual bump in each PR (can
   conflict between parallel PRs) or the deploy job stamps the commit SHA in. Record the choice in D16 and align
   `CLAUDE.md` and the checklist.
+- To do in step 6a: set `include_comments_by_actor: constantinospan`, so Claude only reads the owner's comments
+  (D15). Until then, the README's "anyone else's comments are ignored" only covers triggering.
+- To do in step 6b: the reviewer and fix runs load `CLAUDE.md` and `docs/REVIEW-CHECKLIST.md` from `main`
+  (the base branch), not the PR branch, so a PR can't change the rules it's judged by. The verdict flags any PR that
+  changes them.
 - To do in step 6b: the fix run must push with the Claude App token, not the default workflow token, or its push
   won't re-trigger tests and review.
 - To check in step 7: when a claude.ai/code session opens a PR, is the PR author the owner or the Claude app?
