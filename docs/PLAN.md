@@ -35,6 +35,8 @@ Notes:
   and install Playwright browsers in the job, so it can run checks before pushing.
 - To do in step 6a: allow `Bash(git revert:*)` for the builder (via `claude_args: --allowedTools`) and check out with `fetch-depth: 0`, so
   "`@claude` revert PR #N" works. Test it in the step 7 dry run.
+- To decide in step 4: where you can see a puzzle's seed for bug reports (e.g. small text on a long-press of the
+  level number), without distracting her.
 - To decide in step 4: how the service worker cache version changes. Either a manual bump in each PR (can
   conflict between parallel PRs) or the deploy job stamps the commit SHA in. Record the choice in D16 and align
   `CLAUDE.md` and the checklist.

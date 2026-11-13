@@ -3,15 +3,17 @@
 The AI reviewer checks every PR against this list, and builders use it while working.
 
 ## How to review
-- **Scope.** Review what the PR changes. Mark items that don't apply as N/A. Docs-only PRs aren't reviewed (D15). Changes to `CLAUDE.md`, this checklist, `docs/DECISIONS.md` or anything under `.claude/` are
-  **not** docs-only: they steer every agent run, so they're always reviewed.
+- **Scope.** Review what the PR changes. Mark items that don't apply as N/A. Docs-only PRs aren't reviewed (D15).
+  Changes to `CLAUDE.md`, this checklist, `docs/DECISIONS.md` or anything under `.claude/` are **not** docs-only:
+  they steer every agent run, so they're always reviewed.
 - **Existing problems.** Problems that already exist on `main` are Suggestions, not Blocking.
 - **Play it.** Serve the PR's files locally under a `/logic-lane/` base path (PRs aren't deployed) and play the
   changed game in a real browser. Reading the code isn't enough.
 - **Screen sizes.** Check **phone** 390×844, **tablet** 820×1180 and **desktop** 1280×800. Use touch emulation
   for phone and tablet, and the mouse for desktop.
-- **Rules come from `main`.** Read this checklist and `CLAUDE.md` from `main`, not from the PR branch.
-  If the PR changes either of them, say so at the top of the verdict.
+- **Rules come from `main`.** Judge the PR by `main`'s rules, not the PR's. `CLAUDE.md` in the working tree is
+  already `main`'s. For this checklist, use `git show origin/main:docs/REVIEW-CHECKLIST.md`. If the PR changes either
+  of them, say so at the top of the verdict.
 - **Read-only.** The reviewer never edits code. Its only write is pushing screenshots to the `review-screenshots`
   branch.
 - **Blocking vs Suggestion:**
@@ -51,9 +53,11 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 ## 3. Puzzles
 - [ ] Generator tests exist for the changed game, run many puzzles per level, check every one is solvable and within
       the level's rules, and pass. (Don't try to prove this by playing.)
+- [ ] Generator tests check that the same seed and level always give the same puzzle.
 - [ ] Starting a level about 5 times, with storage cleared or a fresh browser context each time (otherwise the
       3-hour resume brings back the same puzzle), gives at least 2 different layouts.
 - [ ] Easy, Medium and Hard start at the levels defined for the game.
+- [ ] After the top level, it keeps giving fresh puzzles at max difficulty (no end screen, no repeats).
 - [ ] *(suggestion)* Difficulty seems to rise gently, judging by the first levels from each start point.
 
 ## 4. Safety and privacy
