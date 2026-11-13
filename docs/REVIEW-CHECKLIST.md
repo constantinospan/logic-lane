@@ -45,7 +45,8 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 ## 3. Puzzles
 - [ ] Generator tests exist for the changed game, run many puzzles per level, check every one is solvable and within
       the level's rules, and pass. (Don't try to prove this by playing.)
-- [ ] Starting a level about 5 times gives at least 2 different layouts.
+- [ ] Starting a level about 5 times, with storage cleared or a fresh browser context each time (otherwise the
+      3-hour resume brings back the same puzzle), gives at least 2 different layouts.
 - [ ] Easy, Medium and Hard start at the levels defined for the game.
 - [ ] *(suggestion)* Difficulty seems to rise gently, judging by the first levels from each start point.
 

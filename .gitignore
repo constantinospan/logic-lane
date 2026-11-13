@@ -3,3 +3,6 @@ node_modules/
 test-results/
 playwright-report/
 coverage/
+
+# Overrides the owner's global gitignore, which excludes CLAUDE.md
+!CLAUDE.md

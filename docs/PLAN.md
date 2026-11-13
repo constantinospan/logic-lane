@@ -33,6 +33,10 @@ Notes:
 - Step 3 done (2026-11-13): `CLAUDE.md`, `docs/REVIEW-CHECKLIST.md`, README. Reviewed by a fresh agent; fixes applied.
 - To do in step 6a: allow the builder to run the test, type-check and browser-test commands (`allowed_tools`)
   and install Playwright browsers in the job, so it can run checks before pushing.
+- To do in step 6a: allow `Bash(git revert:*)` for the builder and check out with `fetch-depth: 0`, so
+  "`@claude` revert PR #N" works. Test it in the step 7 dry run.
+- To do in step 6b: the fix run must push with the Claude App token, not the default workflow token, or its push
+  won't re-trigger tests and review.
 - To check in step 7: when a claude.ai/code session opens a PR, is the PR author the owner or the Claude app?
   The reviewer's "owner-only" guard (D16) must allow whichever it is.
 - To do in step 6a: make the test job a required status check on `main`, then enforce the rules for admins too
