@@ -1,0 +1,70 @@
+# Review checklist
+
+The AI reviewer checks every PR against this list, and builders use it while working.
+
+## How to review
+- **Scope.** Review what the PR changes. Mark items that don't apply as N/A. Docs-only PRs aren't reviewed (D15).
+- **Existing problems.** Problems that already exist on `main` are Suggestions, not Blocking.
+- **Play it.** Serve the PR's files locally under a `/logic-lane/` base path (PRs aren't deployed) and play the
+  changed game in a real browser. Reading the code isn't enough.
+- **Screen sizes.** Check **phone** 390×844, **tablet** 820×1180 and **desktop** 1280×800. Use touch emulation
+  for phone and tablet, and the mouse for desktop.
+- **Read-only.** The reviewer never edits code. Its only write is pushing screenshots to the `review-screenshots`
+  branch.
+- **Blocking vs Suggestion:**
+  - Blocking is only for concrete problems you can reproduce, with steps.
+  - Judgement calls ("could be clearer", "feels hard") are Suggestions.
+  - Items marked *(suggestion)* below are never Blocking.
+
+## Verdict format
+- **✅ Pass** or **❌ Fail**, then a short list of **Blocking** issues (each one causes ❌) and **Suggestions**
+  (which never cause ❌).
+- Every finding names the screen size and the steps to reproduce it. Include a screenshot for anything visual.
+- Plain English, short. The owner reads it on a phone.
+- Never include the child's name or other personal details. Screenshots show only the game.
+
+## 1. It works
+- [ ] The home screen and the changed game load with no errors in the browser console.
+- [ ] It works at all three screen sizes, with touch (phone and tablet) and with the mouse (desktop).
+- [ ] Nothing overflows the screen, overlaps or gets cut off. No sideways scrolling.
+- [ ] Reloading mid-game resumes the same puzzle (same layout) in the same state.
+- [ ] Every screen has a working way back to the home screen.
+
+## 2. Right for a 5-year-old
+- [ ] Every instruction has a speaker button, and tapping it calls the browser's speech feature.
+      (Headless browsers usually have no voices, so check the call, not the sound.)
+- [ ] Text is a few short, simple English words. No sentences longer than about 6 words.
+- [ ] Tap targets are at least 64×64 CSS px, with at least 8 px between them.
+- [ ] A wrong move never ends the game or loses the level. A retry is one tap away.
+- [ ] Success shows a clear celebration.
+- [ ] No timers or countdowns (unless the owner asked for them).
+- [ ] Text has a contrast ratio of at least 4.5:1. Nothing important is shown by colour alone.
+- [ ] *(suggestion)* What to do is obvious within a few seconds from the pictures alone.
+- [ ] *(suggestion)* Hints are gentle and sounds are friendly.
+
+## 3. Puzzles
+- [ ] Generator tests exist for the changed game, run many puzzles per level, check every one is solvable and within
+      the level's rules, and pass. (Don't try to prove this by playing.)
+- [ ] Starting a level about 5 times gives at least 2 different layouts.
+- [ ] Easy, Medium and Hard start at the levels defined for the game.
+- [ ] *(suggestion)* Difficulty seems to rise gently, judging by the first levels from each start point.
+
+## 4. Safety and privacy
+- [ ] No network requests to anything but the site's own files. Check the browser's network log.
+- [ ] No external links, third-party scripts, fonts or CDNs, ads, analytics or tracking.
+- [ ] No personal details about the child anywhere: code, text, images, commit messages, PR text, screenshots.
+- [ ] All words, pictures and themes are suitable for a 5-year-old.
+
+## 5. Technical
+- [ ] Relative paths only. It works under `/logic-lane/`.
+- [ ] If shipped files changed, the service worker cache version was bumped.
+- [ ] The update prompt and the emergency "clear cache" path still work. It still works offline after one visit.
+- [ ] No build step, framework or runtime dependency added.
+- [ ] Saving goes through the shared storage module.
+- [ ] New or changed logic has tests, and all checks pass.
+
+## Learned rules
+When the owner says the reviewer should have caught something, the builder adds the reason here as a rule (with the
+date) in that same PR.
+
+- (none yet)

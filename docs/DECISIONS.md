@@ -82,7 +82,8 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
 ### D10. Language and reading level
 - English only. Child (5yo) reads simple, easy English words.
 - Icons and pictures first; any text is short, simple words.
-- Optional speaker button reads instructions aloud (browser built-in speech, no audio files).
+- Every instruction has a speaker button that reads it aloud (browser built-in speech, no audio files).
+  The button is always there; using it is optional for her.
 
 ### D11. Home screen
 Big game tiles, tap to play. No profiles, no long-term progress shown.
