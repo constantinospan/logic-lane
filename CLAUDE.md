@@ -91,6 +91,7 @@ automatic fix runs, claude.ai/code sessions and local sessions.
    If that PR changed `.github/workflows/`, don't attempt it. The builder can't push workflow changes, so reply
    asking the owner to use the Revert button on the merged PR. Hand off as above, and don't rewrite history.
 7. **One open request per game at a time.** If another open PR touches the same game, comment saying so and stop.
+   Revert requests (step 6) are exempt: rolling back is urgent.
 8. **Learned rules:** when the owner says the reviewer should have caught something, add the reason as a rule (with
    the date) under "Learned rules" in `docs/REVIEW-CHECKLIST.md`, as part of the same PR.
 
