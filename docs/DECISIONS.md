@@ -37,7 +37,7 @@ request → agent builds on a short-lived branch → PR
 - Deploy only happens from `main` and only when tests pass.
 
 ### D4. AI review agent covers what tests can't
-Runs on GitHub Actions for each PR. Plays the game in a real browser at phone and desktop sizes,
+Runs on GitHub Actions for each PR. Plays the game in a real browser at phone, tablet and desktop sizes,
 takes screenshots, checks against a review checklist (to be written: big tap targets, minimal reading,
 clear feedback, levels solvable, gentle difficulty curve, …). Final "is it fun" judgement stays with the parent.
 
@@ -71,7 +71,7 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
 ### D8. Plain JavaScript (ES modules), no build step
 - Shipped files = repo files. No framework.
 - Type checking via JSDoc comments checked by TypeScript in CI (no compilation).
-- Dev tooling only for checks: unit tests (Vitest), browser tests (Playwright, phone + desktop sizes). Runs in CI before deploy.
+- Dev tooling only for checks: unit tests (Vitest), browser tests (Playwright, phone + tablet + desktop sizes). Runs in CI before deploy.
 - Rejected: Vite+TypeScript, Svelte (build step not worth it at this size), game engines (too heavy for grid puzzles).
 
 ### D9. Installable app (PWA)

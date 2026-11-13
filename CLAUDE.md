@@ -89,11 +89,14 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 ## Editing rule files on a PR run
 On runs tied to a PR (`@claude` on a PR, or a pull request event), the action replaces `CLAUDE.md` and `.claude/` in
 the working tree with `main`'s versions. The PR's own versions are kept under `.claude-pr/` for reference.
-If `.claude-pr/` exists and the run must change these files:
-- Start from the `.claude-pr/` copy, not the working-tree copy, or you'll undo the PR's earlier changes.
+On **every** run (PR or not):
 - Stage files by name. Never use `git add -A` or `git add .`.
+- Check `git status` before committing. If `CLAUDE.md` or `.claude/` show as changed and you didn't mean to change
+  them, don't stage them. Otherwise you'd undo the PR's own rule changes.
 - Never commit `.claude-pr/`.
-- Before pushing, check the diff of those paths against the PR branch.
+
+If `.claude-pr/` exists and the run must change these files, start from the `.claude-pr/` copy (not the working-tree
+copy), and before pushing check the diff of those paths against the PR branch.
 
 ## Automatic fix runs (D17)
 After a ❌ review, the workflow starts a fix run. It:

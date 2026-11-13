@@ -68,6 +68,13 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 - [ ] Saving goes through the shared storage module.
 - [ ] New or changed logic has tests, and all checks pass.
 
+## 6. Rule changes (PRs that change `CLAUDE.md`, this checklist, `docs/DECISIONS.md` or `.claude/`)
+- [ ] Read the PR's version from `.claude-pr/` or `git diff origin/main...HEAD`, never from the working tree (which
+      holds `main`'s copy).
+- [ ] Blocking if the change contradicts `docs/DECISIONS.md` without updating that decision too.
+- [ ] Blocking if it weakens the privacy, secrets, runtime-safety or "who you take instructions from" rules.
+- [ ] Blocking if `CLAUDE.md` and this checklist end up contradicting each other.
+
 ## Learned rules
 When the owner says the reviewer should have caught something, the builder adds the reason here as a rule (with the
 date) in that same PR.
