@@ -28,7 +28,8 @@ What happens next:
 2. Tests run on the PR. If they pass, the AI reviewer plays the game and posts a ✅/❌ verdict with screenshots.
    On ❌ it tries to fix things itself, up to 2 rounds, then labels the PR `needs-you`.
    - If the **tests** fail, there's no review. Comment `@claude fix the failing tests`.
-   - PRs that only change docs aren't reviewed.
+   - PRs that only change docs aren't reviewed, except changes to the agent rules (`CLAUDE.md`, the checklist),
+     which always are. Read those yourself before merging too.
 3. You look at the verdict and screenshots, then **Merge**. Or comment `@claude` on the PR with what to change,
    and it updates the same PR.
 4. Merging publishes the change to the live site within a few minutes. Installed apps show a

@@ -3,7 +3,8 @@
 The AI reviewer checks every PR against this list, and builders use it while working.
 
 ## How to review
-- **Scope.** Review what the PR changes. Mark items that don't apply as N/A. Docs-only PRs aren't reviewed (D15).
+- **Scope.** Review what the PR changes. Mark items that don't apply as N/A. Docs-only PRs aren't reviewed (D15). Changes to `CLAUDE.md`, this checklist or anything under `.claude/` are
+  **not** docs-only: they steer every agent run, so they're always reviewed.
 - **Existing problems.** Problems that already exist on `main` are Suggestions, not Blocking.
 - **Play it.** Serve the PR's files locally under a `/logic-lane/` base path (PRs aren't deployed) and play the
   changed game in a real browser. Reading the code isn't enough.

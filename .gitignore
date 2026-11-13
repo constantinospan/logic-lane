@@ -4,5 +4,9 @@ test-results/
 playwright-report/
 coverage/
 
-# Overrides the owner's global gitignore, which excludes CLAUDE.md
+# Overrides the owner's global gitignore, which excludes agent files.
+# Agent rules must be committed so GitHub and cloud runs see them (D5).
 !CLAUDE.md
+!.claude/
+!agents/
+.claude/settings.local.json

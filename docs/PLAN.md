@@ -35,6 +35,9 @@ Notes:
   and install Playwright browsers in the job, so it can run checks before pushing.
 - To do in step 6a: allow `Bash(git revert:*)` for the builder and check out with `fetch-depth: 0`, so
   "`@claude` revert PR #N" works. Test it in the step 7 dry run.
+- To decide in step 4: how the service worker cache version changes. Either a manual bump in each PR (can
+  conflict between parallel PRs) or the deploy job stamps the commit SHA in. Record the choice in D16 and align
+  `CLAUDE.md` and the checklist.
 - To do in step 6b: the fix run must push with the Claude App token, not the default workflow token, or its push
   won't re-trigger tests and review.
 - To check in step 7: when a claude.ai/code session opens a PR, is the PR author the owner or the Claude app?
