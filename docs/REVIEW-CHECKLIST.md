@@ -15,14 +15,16 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 - **Read-only.** The reviewer never edits code. Its only write is pushing screenshots to the `review-screenshots`
   branch.
 - **Blocking vs Suggestion:**
-  - Blocking is only for concrete problems you can reproduce, with steps.
+  - Blocking needs concrete evidence: steps to reproduce for behaviour, or the file and line for code, test and
+    rule problems.
   - Judgement calls ("could be clearer", "feels hard") are Suggestions.
   - Items marked *(suggestion)* below are never Blocking.
 
 ## Verdict format
 - **✅ Pass** or **❌ Fail**, then a short list of **Blocking** issues (each one causes ❌) and **Suggestions**
   (which never cause ❌).
-- Every finding names the screen size and the steps to reproduce it. Include a screenshot for anything visual.
+- Every finding gives its evidence. Visual or behaviour findings name the screen size and the steps, plus a
+  screenshot. Code, test and rule findings name the file and line.
 - Plain English, short. The owner reads it on a phone.
 - Never include the child's name or other personal details. Screenshots show only the game.
 
