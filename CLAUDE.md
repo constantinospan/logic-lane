@@ -113,7 +113,8 @@ After a ❌ review, the workflow starts a fix run. It:
 - fixes only the listed **Blocking** items, not Suggestions and not new features
 - runs all checks, pushes, and comments listing what it fixed, and anything it couldn't fix and why
 
-If a Blocking item seems wrong, or would break a decision, the fix run doesn't attempt it. It explains why in its
+If a Blocking item seems wrong, would break a decision, or would undo something the owner explicitly asked for in
+the issue or PR, the fix run doesn't attempt it. It explains why in its
 comment so the owner can decide. If a fix run ends up pushing nothing (it skipped every item, or checks still
 fail), it says so plainly in its comment and adds the `needs-you` label, so the PR doesn't sit unnoticed.
 

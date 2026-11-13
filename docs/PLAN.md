@@ -55,6 +55,6 @@ Notes:
   the action treats the PR as coming from a non-write author and blocks npm and test runners on it, so `@claude`
   and fix runs couldn't run checks there. In that case, sessions should push the branch and let the owner open the PR.
 - To decide in step 6b: how fix runs start. If not tied to the PR (e.g. `workflow_dispatch`), there's no
-  `.claude-pr/` restore; check `CLAUDE.md`'s "Editing rule files" section still fits.
+  `.claude-pr/` restore; check `CLAUDE.md`'s "Staging changes, and rule files on PR runs" section still fits.
 - To do in step 6a: make the test job a required status check on `main`, then enforce the rules for admins too
   (left off for now so setup can bootstrap).
