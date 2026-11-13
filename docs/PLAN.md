@@ -31,9 +31,9 @@ Notes:
 - Step 2 done (2026-11-13): Claude GitHub App installed on logic-lane only; secret `CLAUDE_CODE_OAUTH_TOKEN` set.
   Token created 2026-11-13, expected to expire around 2027-11 — renew with `claude setup-token` + `gh secret set`.
 - Step 3 done (2026-11-13): `CLAUDE.md`, `docs/REVIEW-CHECKLIST.md`, README. Reviewed by a fresh agent; fixes applied.
-- To do in step 6a: allow the builder to run the test, type-check and browser-test commands (`allowed_tools`)
+- To do in step 6a: allow the builder to run the test, type-check and browser-test commands (`claude_args: --allowedTools ...`)
   and install Playwright browsers in the job, so it can run checks before pushing.
-- To do in step 6a: allow `Bash(git revert:*)` for the builder and check out with `fetch-depth: 0`, so
+- To do in step 6a: allow `Bash(git revert:*)` for the builder (via `claude_args: --allowedTools`) and check out with `fetch-depth: 0`, so
   "`@claude` revert PR #N" works. Test it in the step 7 dry run.
 - To decide in step 4: how the service worker cache version changes. Either a manual bump in each PR (can
   conflict between parallel PRs) or the deploy job stamps the commit SHA in. Record the choice in D16 and align
@@ -41,10 +41,13 @@ Notes:
 - To do in step 6a: set `include_comments_by_actor: constantinospan`, so Claude only reads the owner's comments
   (D15). Until then, the README's "anyone else's comments are ignored" only covers triggering.
 - To do in step 6b: the reviewer and fix runs load `CLAUDE.md` and `docs/REVIEW-CHECKLIST.md` from `main`
-  (the base branch), not the PR branch, so a PR can't change the rules it's judged by. The verdict flags any PR that
+  (the base branch), not the PR branch, so a PR can't change the rules it's judged by. The action already does
+  this for `CLAUDE.md` and `.claude/`. The checklist (in `docs/`) must be read from `main` explicitly. The verdict flags any PR that
   changes them.
 - To do in step 6b: the fix run must push with the Claude App token, not the default workflow token, or its push
   won't re-trigger tests and review.
+- To check in step 7: can a claude.ai/code session push a change under `.github/workflows/`? Until then,
+  pipeline changes are local-only.
 - To check in step 7: when a claude.ai/code session opens a PR, is the PR author the owner or the Claude app?
   The reviewer's "owner-only" guard (D16) must allow whichever it is.
 - To do in step 6a: make the test job a required status check on `main`, then enforce the rules for admins too

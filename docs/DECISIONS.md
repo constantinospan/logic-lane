@@ -114,7 +114,9 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Install via the Claude GitHub App (`/install-github-app`). Its pushes trigger other workflows; the default
   GITHUB_TOKEN would NOT, so never rely on GITHUB_TOKEN for pushes that must trigger review/deploy.
 - The action pushes a branch and posts a "Create PR" link (one tap); it does not open PRs itself by default.
-- The action cannot edit `.github/workflows/*`. Pipeline changes go through claude.ai/code, a local session, or by hand.
+- The action cannot edit `.github/workflows/*`. Pipeline changes go through a local session, or by hand
+  (claude.ai/code may share the same limit; untested).
+- On PR runs the action restores `CLAUDE.md` and `.claude/` from the base branch; PR versions go to `.claude-pr/`.
 - Screenshots: no native PR image upload. Reviewer commits screenshots to a dedicated `review-screenshots` branch
   and embeds the links in its PR comment.
 - Public-repo hygiene: keep `show_full_output` off (logs are public); limit comments Claude reads to the owner

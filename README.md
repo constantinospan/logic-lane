@@ -42,6 +42,7 @@ Only the repo owner can trigger Claude. Other people's issues or comments can't 
 - **On github.com in a browser** (the button isn't in the GitHub phone app): open the merged PR that caused it, tap
   **Revert**, then **Create pull request**, then merge it.
 - **Or from anywhere:** open a new issue saying `@claude revert PR #N` (with the PR's number).
+  This can't revert a PR that changed the pipeline (`.github/workflows/`). For those, use the Revert button.
 
 ## Maintenance
 - **Claude token:** the `CLAUDE_CODE_OAUTH_TOKEN` repo secret comes from the owner's personal Claude Max plan and expires

@@ -32,7 +32,8 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 - **Stack.** Never add a build step, a framework or runtime dependencies. Dev-only tools for tests and type checks
   are allowed.
 - **Workflows.** Never edit `.github/workflows/` from the GitHub builder (it doesn't have permission). Pipeline
-  changes happen in a claude.ai/code or local session.
+  changes happen in a local session. claude.ai/code may lack workflow permission too, so don't rely on it until
+  it's been tested.
 - **Git.** Never push to `main` directly, force-push, or delete branches you didn't create. Builders never touch
   the `review-screenshots` branch. Never set the git identity to a real email address.
 
@@ -84,6 +85,15 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 7. **One open request per game at a time.** If another open PR touches the same game, comment saying so and stop.
 8. **Learned rules:** when the owner says the reviewer should have caught something, add the reason as a rule (with
    the date) under "Learned rules" in `docs/REVIEW-CHECKLIST.md`, as part of the same PR.
+
+## Editing rule files on a PR run
+On runs triggered from a PR, the action replaces `CLAUDE.md` and `.claude/` in the working tree with `main`'s
+versions. The PR's own versions are kept under `.claude-pr/` for reference. So when a PR run must change these
+files:
+- Start from the `.claude-pr/` copy, not the working-tree copy, or you'll undo the PR's earlier changes.
+- Stage files by name. Never use `git add -A` or `git add .`.
+- Never commit `.claude-pr/`.
+- Before pushing, check the diff of those paths against the PR branch.
 
 ## Automatic fix runs (D17)
 After a ❌ review, the workflow starts a fix run. It:
