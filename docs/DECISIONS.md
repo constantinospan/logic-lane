@@ -37,7 +37,7 @@ request → agent builds on a short-lived branch → PR
 - Deploy only happens from `main` and only when tests pass.
 
 ### D4. AI review agent covers what tests can't
-Runs on GitHub Actions for each PR. Plays the game in a real browser at phone and desktop sizes,
+Runs on GitHub Actions for each PR. Plays the game in a real browser at phone, tablet and desktop sizes,
 takes screenshots, checks against a review checklist (to be written: big tap targets, minimal reading,
 clear feedback, levels solvable, gentle difficulty curve, …). Final "is it fun" judgement stays with the parent.
 
@@ -71,7 +71,7 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
 ### D8. Plain JavaScript (ES modules), no build step
 - Shipped files = repo files. No framework.
 - Type checking via JSDoc comments checked by TypeScript in CI (no compilation).
-- Dev tooling only for checks: unit tests (Vitest), browser tests (Playwright, phone + desktop sizes). Runs in CI before deploy.
+- Dev tooling only for checks: unit tests (Vitest), browser tests (Playwright, phone + tablet + desktop sizes). Runs in CI before deploy.
 - Rejected: Vite+TypeScript, Svelte (build step not worth it at this size), game engines (too heavy for grid puzzles).
 
 ### D9. Installable app (PWA)
@@ -82,7 +82,8 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
 ### D10. Language and reading level
 - English only. Child (5yo) reads simple, easy English words.
 - Icons and pictures first; any text is short, simple words.
-- Optional speaker button reads instructions aloud (browser built-in speech, no audio files).
+- Every instruction has a speaker button that reads it aloud (browser built-in speech, no audio files).
+  The button is always there; using it is optional for her.
 
 ### D11. Home screen
 Big game tiles, tap to play. No profiles, no long-term progress shown.
@@ -113,14 +114,18 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Install via the Claude GitHub App (`/install-github-app`). Its pushes trigger other workflows; the default
   GITHUB_TOKEN would NOT, so never rely on GITHUB_TOKEN for pushes that must trigger review/deploy.
 - The action pushes a branch and posts a "Create PR" link (one tap); it does not open PRs itself by default.
-- The action cannot edit `.github/workflows/*`. Pipeline changes go through claude.ai/code, a local session, or by hand.
+- The action cannot edit `.github/workflows/*`. Pipeline changes go through a local session, or by hand
+  (claude.ai/code may share the same limit; untested).
+- On PR runs the action restores `CLAUDE.md` and `.claude/` from the base branch; PR versions go to `.claude-pr/`.
 - Screenshots: no native PR image upload. Reviewer commits screenshots to a dedicated `review-screenshots` branch
   and embeds the links in its PR comment.
 - Public-repo hygiene: keep `show_full_output` off (logs are public); limit comments Claude reads to the owner
   (`include_comments_by_actor`); only `@claude` on the owner's own issues.
 - Branch protection on `main`: tests must pass before merge.
+- Squash merges only (merge commits and rebase merging are off): one commit per PR, so reverting is always one step.
 - Reviewer is a separate run with a strict, critical prompt and checklist; the parent is the final judge.
 - Quota: runs share the owner's Max limits. Reviewer runs only after tests pass; skip it for docs-only changes.
+  `CLAUDE.md`, `docs/REVIEW-CHECKLIST.md`, `docs/DECISIONS.md` and `.claude/` never count as docs-only: they're always reviewed.
 
 ### D16. Second review round
 - Only the owner can trigger the builder (write access required; no collaborators; bots blocked).
