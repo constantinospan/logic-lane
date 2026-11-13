@@ -46,6 +46,7 @@ export function renderPlay(root, game, startRecord, store) {
     mounted = game.mount(area, puzzle, {
       state: record.state,
       saveState: (state) => {
+        if (solvedOnce) return; // record already points at the next puzzle
         record = { ...record, state };
         save();
       },

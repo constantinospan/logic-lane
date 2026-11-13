@@ -43,6 +43,8 @@ Notes:
   via `page.route`). `tsc` `checkJs`, with a separate config for `sw.js` (webworker lib).
 - To do in step 6a: the deploy job writes a hash of the shipped files into `VERSION` in `sw.js` (only that line).
 - Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.
+- Check in step 9 on the real iPad: the 3 s holds (home title, Reset) and the seed long-press aren't cancelled by
+  iOS (only tested in Chrome so far).
 - To do in step 6a: set `include_comments_by_actor: constantinospan`, so Claude only reads the owner's comments
   (D15). Until then, the README's "anyone else's comments are ignored" only covers triggering.
 - To do in step 6b: the reviewer and fix runs load `CLAUDE.md` and `docs/REVIEW-CHECKLIST.md` from `main`

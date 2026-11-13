@@ -6,13 +6,16 @@ import { PREFIX } from '../core/storage.js';
 
 /** @type {ServiceWorkerRegistration | null} */
 let registration = null;
+let updateRequested = false;
 
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
 
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloading) return;
+    // Only reload when she tapped "New!". The very first install also changes the controller, and must not
+    // reload the page under her finger.
+    if (!updateRequested || reloading) return;
     reloading = true;
     location.reload(); // the new version is in control; resume brings her back to the same puzzle
   });
@@ -46,7 +49,10 @@ function showUpdateBanner(worker) {
     h('span', { text: '⬆️' }),
     h('span', { text: 'New!' }),
   ]);
-  banner.addEventListener('click', () => worker.postMessage('skipWaiting'));
+  banner.addEventListener('click', () => {
+    updateRequested = true;
+    worker.postMessage('skipWaiting');
+  });
   document.body.append(banner);
 }
 

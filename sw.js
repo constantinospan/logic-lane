@@ -35,7 +35,10 @@ const PRECACHE = [
 const sw = /** @type {ServiceWorkerGlobalScope} */ (/** @type {unknown} */ (self));
 
 sw.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));
+  // cache: 'reload' skips the browser's HTTP cache, so a new version never stores old files.
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' })))),
+  );
 });
 
 sw.addEventListener('activate', (event) => {
