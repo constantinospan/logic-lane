@@ -33,7 +33,7 @@ const demo = {
   instruction: () => 'Tap the same picture.',
 
   createPuzzle(level, rng) {
-    const count = Math.min(THINGS.length, 2 + Math.floor((level - 1) / 5)); // 2 choices at level 1, up to 8
+    const count = Math.min(THINGS.length, 2 + Math.floor((level - 1) / 5)); // 2 choices at level 1, 7 at level 30
     const choices = rng.shuffle(THINGS).slice(0, count);
     /** @type {DemoPuzzle} */
     const puzzle = { target: rng.pick(choices), choices };

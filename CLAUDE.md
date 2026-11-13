@@ -81,8 +81,8 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 3. Keep the change focused on the request. Add or update tests for any logic you change. Generators get tests that
    create many puzzles per level and check they are solvable and within the level's difficulty rules. Keep test
    runs short.
-4. Run all checks before pushing: unit tests, type check, browser tests. The exact commands are in `package.json`
-   (set up in plan step 5). Don't push failing checks. If you couldn't run a check, say so in the PR. Never
+4. Run all checks before pushing: `npm run check` (type check, unit tests, browser tests; see `docs/TESTING.md`).
+   A new game adds `tests/unit/games/<id>.test.js` (see `docs/GAME-API.md`). Don't push failing checks. If you couldn't run a check, say so in the PR. Never
    claim checks passed when you didn't run them.
 5. **Hand-off:**
    - The GitHub builder posts the **Create PR** link.

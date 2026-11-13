@@ -12,10 +12,13 @@ The exact contract, with types, is the `Game` typedef in [`js/core/games.js`](..
 2. Register it in `js/core/games.js`: import it, add it to `GAMES`, and remove it from `COMING_SOON` if it's
    listed there.
 3. Add every new file to `PRECACHE` in `sw.js`, or it won't work offline. A test checks this.
-4. Add tests:
-   - the generator is deterministic (same seed and level give the same puzzle);
-   - every generated puzzle at every level is solvable;
+4. Add `tests/unit/games/<id>.test.js` proving, for many seeds at every level:
+   - every generated puzzle is solvable (use a solver);
    - every puzzle stays within that level's difficulty rules.
+
+   `tests/unit/games.test.js` already checks every registered game automatically: the ladder is valid, the
+   instruction isn't empty, the same seed gives the same puzzle, and `Math.random` isn't used. See
+   `docs/TESTING.md`.
 
 ## The Game object
 | Field | What it is |
