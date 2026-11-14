@@ -23,8 +23,9 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 - **Opening issues for the owner (sessions only, 2026-11-14):** when the owner asks a local or claude.ai/code session
   for work to be done on GitHub, the session may open the issue as the owner (`gh issue create`, with `@claude` in
   the body), so the GitHub builder picks it up. Write the request so it stands on its own. Show the owner the issue
-  text and wait for their OK before posting, unless they said to post it. The privacy rule applies to the text. The
-  GitHub builder, reviewers and fix runs never open issues.
+  text and wait for their OK before posting, unless they said to post it. The privacy rule applies to the text. If
+  `gh` isn't signed in as the owner (`gh api user -q .login`), give the owner the text to post instead. The GitHub
+  builder, reviewers and fix runs never open issues.
 
 ## Never do
 - **Privacy.** Never put the child's name, photos, school or anything else personal into the repo, issues, PRs,
