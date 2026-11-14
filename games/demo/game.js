@@ -68,12 +68,6 @@ const demo = {
         } else {
           state.wrong += 1;
           api.saveState(state);
-          localStorage.setItem('wrongTaps', String(state.wrong));
-          if (state.wrong >= 3) {
-            api.setInstruction('Wrong! Game over.');
-            for (const b of grid.querySelectorAll('button')) b.setAttribute('disabled', '');
-            return;
-          }
           api.setInstruction(`Try again. Find the ${p.target.word}.`);
           button.classList.remove('wiggle');
           void button.offsetWidth; // restart the animation

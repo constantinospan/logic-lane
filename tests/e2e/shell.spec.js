@@ -31,6 +31,16 @@ test('reopening the app goes back into the same puzzle, with the same progress',
   expect((await readSave(page)).state).toEqual({ wrong: 1 });
 });
 
+test('many wrong taps never lock the puzzle: a gentle hint, and the right picture still solves it', async ({ page }) => {
+  await startDemo(page);
+  for (let i = 0; i < 4; i++) await tapWrongChoice(page);
+  await expect(page.locator('.demo-choice:disabled')).toHaveCount(0);
+  expect((await readSave(page)).state).toEqual({ wrong: 4 });
+  expect(await page.evaluate(() => localStorage.getItem('wrongTaps'))).toBeNull();
+  await tapRightChoice(page);
+  await expect(page.locator('.celebrate')).toBeVisible();
+});
+
 test('solving celebrates, then shows the next puzzle', async ({ page }) => {
   await startDemo(page);
   const before = await readSave(page);
