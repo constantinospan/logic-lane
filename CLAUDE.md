@@ -81,7 +81,9 @@ automatic fix runs, claude.ai/code sessions and local sessions.
    - `@claude` on an open PR means pushing to that PR's branch.
 3. Keep the change focused on the request. Add or update tests for any logic you change. Generators get tests that
    create many puzzles per level and check they are solvable and within the level's difficulty rules. Keep test
-   runs short.
+   runs short (D20): heavy checks go in unit tests; a game's browser tests cover play, mistake, solve and its
+   pictures. If `main`'s CI takes more than 2m30s, or this adds the third game, say in the PR that plan step 10
+   (test scaling) is due.
 4. Run all checks before pushing: `npm run check` (type check, unit tests, browser tests; see `docs/TESTING.md`).
    A new game adds `tests/unit/games/<id>.test.js` (see `docs/GAME-API.md`). Don't push failing checks. If you couldn't run a check, say so in the PR. Never
    claim checks passed when you didn't run them.
