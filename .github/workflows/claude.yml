@@ -159,7 +159,8 @@ jobs:
     # Runs when the route job passed the owner guard and either skipped the check or the idea check passed.
     if: >-
       !cancelled() && needs.route.result == 'success' && (
-        needs.route.outputs.route == 'skip' || needs.idea-verdict.outputs.go == 'true'
+        needs.route.outputs.route == 'skip' ||
+        (needs.idea-verdict.result == 'success' && needs.idea-verdict.outputs.go == 'true')
       )
     # One run per issue or PR at a time, so two requests never push to the same branch at once. Set on the job, not
     # the workflow: skipped runs (anyone else's comment, the app's own comments) then never join the queue, so they

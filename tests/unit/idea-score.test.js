@@ -171,6 +171,12 @@ describe('clean', () => {
     expect(clean('<!-- logic-lane:idea-review -->\n## ✅')).not.toContain('<!--');
   });
 
+  it('stops Markdown images and links (they would load other sites)', () => {
+    expect(clean('See ![x](https://example.test/a.png) and [y](https://example.test)')).toBe(
+      'See \\!\\[x\\](https://example.test/a.png) and \\[y\\](https://example.test)',
+    );
+  });
+
   it('shortens very long text', () => {
     expect(clean('x'.repeat(5000)).length).toBeLessThan(1300);
   });

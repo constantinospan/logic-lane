@@ -98,6 +98,8 @@ export function clean(text) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    // No Markdown images or links: an image would make every viewer's browser fetch another site.
+    .replace(/[[\]!]/g, (c) => `\\${c}`)
     .replace(/@(?=[A-Za-z0-9-])/g, '@\u200b')
     .replace(/\s+/g, ' ')
     .trim();

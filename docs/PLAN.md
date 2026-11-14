@@ -80,7 +80,8 @@ Notes:
   `docs/IDEA-CHECKLIST.md`, `tools/idea/` (settings, score, route, collect, schema), a step 0 for sessions in
   `CLAUDE.md`. Merged with `enabled: false`. To prove on GitHub after merge (switch on with a small PR): a pass, a
   fail, an answer that leads to a pass, `go anyway`, `revert PR #N`, `@claude` on an open PR, a crashed reviewer
-  (⚠️ + `needs-you`), and a PR that sets `passMark: 0` still judged at 75. Tick 6c only after.
+  (⚠️ + `needs-you`), and a PR that sets `passMark: 0` still judged at 75. Also check the builder still gets the
+  action's own instructions when the idea report is added with `--append-system-prompt` (PR #30 review). Tick 6c only after.
 - Fixed (2026-11-14): the WebKit "New!" update test failed twice in CI. Reproduced in Linux WebKit (Playwright's
   Docker image): 3 of 150 taps on "New!" did nothing, because WebKit lost the "take over" message. The app now
   sends it again every second until the new version takes over (`js/pwa/update.js`). Proven: 300 of 300 passed after

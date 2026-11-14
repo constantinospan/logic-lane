@@ -64,7 +64,7 @@ describe('claude.yml: idea gate', () => {
 
   it('the builder runs only on a skip or a passed check', () => {
     expect(job('claude')).toMatch(
-      /needs\.route\.outputs\.route == 'skip' \|\| needs\.idea-verdict\.outputs\.go == 'true'/,
+      /needs\.route\.outputs\.route == 'skip' \|\|\s+\(needs\.idea-verdict\.result == 'success' && needs\.idea-verdict\.outputs\.go == 'true'\)/,
     );
   });
 
