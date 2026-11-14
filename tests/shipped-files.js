@@ -3,6 +3,8 @@
 // "does this PR need a play review?" rule (D19). sw.js itself is excluded (it holds the list).
 
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -32,4 +34,14 @@ export function shippedFiles() {
  */
 export function isShipped(path) {
   return ROOT_FILES.includes(path) || FOLDERS.some((d) => path.startsWith(d)) || path === 'sw.js';
+}
+
+/**
+ * The PRECACHE list from sw.js, as repo-relative paths ('' is the start page './').
+ * @returns {string[]}
+ */
+export function precacheList() {
+  const sw = fs.readFileSync(path.join(REPO_ROOT, 'sw.js'), 'utf8');
+  const block = sw.match(/const PRECACHE = \[([\s\S]*?)\];/)?.[1] ?? '';
+  return [...block.matchAll(/'\.\/([^']*)'/g)].map((m) => m[1]);
 }

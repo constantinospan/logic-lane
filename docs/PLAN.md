@@ -48,7 +48,7 @@ Notes:
   `tests/shipped-files.js`); the code reviewer runs on every non-docs PR (D19).
 - Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.
 - Check in step 9 on the real iPad: the 3 s holds (home title, Reset) and the seed long-press aren't cancelled by
-  iOS (only tested in Chrome so far).
+  iOS. They're tested in Chromium and WebKit with a mouse, but not yet with real touch on iOS.
 - To do in step 6a: set `include_comments_by_actor: constantinospan`, so Claude only reads the owner's comments
   (D15). Until then, the README's "anyone else's comments are ignored" only covers triggering.
 - To do in step 6b: the reviewer and fix runs load `CLAUDE.md` and `docs/REVIEW-CHECKLIST.md` from `main`

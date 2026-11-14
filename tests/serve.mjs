@@ -20,6 +20,16 @@ const TYPES = {
   '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.ico': 'image/x-icon',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.woff2': 'font/woff2',
   '.md': 'text/markdown; charset=utf-8',
 };
 
@@ -35,7 +45,14 @@ const server = http.createServer((req, res) => {
     res.end('Not found');
     return;
   }
-  let rel = decodeURIComponent(url.pathname.slice(BASE.length));
+  let rel;
+  try {
+    rel = decodeURIComponent(url.pathname.slice(BASE.length));
+  } catch {
+    res.writeHead(400);
+    res.end('Bad request');
+    return;
+  }
   if (rel === '' || rel.endsWith('/')) rel += 'index.html';
   const file = path.resolve(ROOT, rel);
   const insideRepo = file.startsWith(ROOT) && !rel.split('/').some((p) => p.startsWith('.') || p === 'node_modules');

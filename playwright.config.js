@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4173;
+const PORT = 4174; // not 4173 (used for manual play), so a stray server never gets reused by mistake
 
 export default defineConfig({
   testDir: 'tests/e2e',

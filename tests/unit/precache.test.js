@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { REPO_ROOT, shippedFiles } from '../shipped-files.js';
+import { precacheList, REPO_ROOT, shippedFiles } from '../shipped-files.js';
 
 const sw = fs.readFileSync(path.join(REPO_ROOT, 'sw.js'), 'utf8');
-const precacheBlock = sw.match(/const PRECACHE = \[([\s\S]*?)\];/)?.[1] ?? '';
-const precache = [...precacheBlock.matchAll(/'\.\/([^']*)'/g)].map((m) => m[1]);
+const precache = precacheList();
 
 describe('service worker', () => {
   it('precaches exactly the shipped files (so everything works offline)', () => {

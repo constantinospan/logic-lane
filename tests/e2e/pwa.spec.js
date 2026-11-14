@@ -19,13 +19,26 @@ test('the service worker installs and only uses logic-lane: caches', async ({ pa
 });
 
 test('the first visit does not reload the page by itself', async ({ page }) => {
-  await page.goto('./');
-  await page.evaluate(() => {
-    /** @type {any} */ (window).__sameDocument = true;
+  let loads = 0;
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) loads += 1;
   });
+  await page.goto('./');
   await waitForControl(page);
   await page.waitForTimeout(500);
-  expect(await page.evaluate(() => /** @type {any} */ (window).__sameDocument)).toBe(true);
+  expect(loads).toBe(1);
+});
+
+test('after one visit, it works offline', async ({ page, context }) => {
+  await page.goto('./');
+  await waitForControl(page);
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.locator('.home-title')).toBeVisible();
+  await page.goto('./#/game/demo');
+  await page.locator('.choice-easy').click();
+  await expect(page.locator('.demo-choice').first()).toBeVisible();
+  await context.setOffline(false);
 });
 
 test('a new version shows "New!", and tapping it updates into the same puzzle', async ({ page, context, baseURL }) => {
@@ -46,7 +59,7 @@ test('a new version shows "New!", and tapping it updates into the same puzzle', 
   await expect(page).toHaveURL(/#\/play\/demo$/);
   await expect(page.locator('.demo-choice').first()).toBeVisible();
   expect((await readSave(page)).seed).toBe(before.seed);
-  const names = await page.evaluate(() => caches.keys());
-  expect(names).toContain('logic-lane:test-next');
-  expect(names).not.toContain('logic-lane:dev'); // the old version's cache is cleaned up
+  // The old version's cache is cleaned up (activate may finish just after the reload, so retry briefly).
+  await expect.poll(() => page.evaluate(() => caches.keys())).toContain('logic-lane:test-next');
+  await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('logic-lane:dev');
 });

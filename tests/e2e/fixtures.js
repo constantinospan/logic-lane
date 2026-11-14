@@ -4,6 +4,9 @@
 // It also replaces speech with a stub that records what would have been spoken.
 
 import { test as base, expect } from '@playwright/test';
+import { precacheList } from '../shipped-files.js';
+
+const PRECACHED = new Set(precacheList());
 
 export const test = base.extend({
   context: async ({ context }, use) => {
@@ -40,9 +43,14 @@ export const test = base.extend({
     page.on('pageerror', (err) => problems.push(`page error: ${err.message}`));
     context.on('request', (req) => {
       const url = req.url();
-      if (!url.startsWith(String(baseURL)) && !url.startsWith('data:') && !url.startsWith('blob:')) {
+      if (url.startsWith('data:') || url.startsWith('blob:')) return;
+      if (!url.startsWith(String(baseURL))) {
         problems.push(`request outside the site: ${url}`);
+        return;
       }
+      // Anything the site loads must be precached, or it breaks offline (catches new folders like sounds/).
+      const file = new URL(url).pathname.slice(new URL(String(baseURL)).pathname.length);
+      if (file !== 'sw.js' && !PRECACHED.has(file)) problems.push(`loaded but not in PRECACHE (sw.js): ${file}`);
     });
     await use(page);
     expect(problems, 'no console errors, page errors or outside requests').toEqual([]);

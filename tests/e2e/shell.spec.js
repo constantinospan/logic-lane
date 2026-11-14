@@ -79,13 +79,13 @@ for (const [name, path] of [
     else await startDemo(page, 'hard'); // most choices on screen
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(overflow).toBe(false);
-    const smallest = await page.evaluate(() =>
-      Math.min(
-        ...[...document.querySelectorAll('button, a.tile')]
-          .filter((el) => /** @type {HTMLElement} */ (el).offsetParent !== null)
-          .map((el) => Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height)),
-      ),
+    const sizes = await page.evaluate(() =>
+      [...document.querySelectorAll('button, a, .tile')]
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0) // visible, including fixed-position elements
+        .map((r) => Math.min(r.width, r.height)),
     );
-    expect(smallest).toBeGreaterThanOrEqual(64);
+    expect(sizes.length).toBeGreaterThan(0);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(64);
   });
 }
