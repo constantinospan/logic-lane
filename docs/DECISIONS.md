@@ -218,6 +218,11 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
   fix comment says so. Loosening the setting, or pushing with an owner token, were the rejected alternatives.
 - A review that didn't finish (a reviewer crashed or timed out) is never ✅ and never starts a fix: it's posted as
   ⚠️ with `needs-you`.
+- The fix loop is optional (owner, 2026-11-14): `AI_FIX` is **off** by default after the 6b proof. A ❌ verdict then
+  ends with "comment `@claude fix the Blocking items`", and the owner switches `AI_FIX` on when they want fixes to
+  start by themselves. Reasons: plan usage, and an Approve tap per round.
+- The fix run gets the owner's own words (the PR description and the owner's comments), so it can skip an item that
+  would undo something the owner asked for.
 
 ### D18. Child privacy in a public repo
 - Never put the child's name, photos, school or other identifying details in the repo, issues, PRs or screenshots.
