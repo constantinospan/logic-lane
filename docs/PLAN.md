@@ -12,7 +12,7 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 5 ✅ | Tests | Unit tests, browser tests at phone, tablet + desktop sizes, type checking | Claude | — | 1 h |
 | 6a ✅ | Core pipeline | Tests gate + deploy, builder (`@claude`), fork guards. A working request → PR → merge → live loop | Claude | — | 1–1.5 h |
 | 7 ✅ | Dry run | You open a small test issue from your phone, watch it go to PR → merge → live | Both | 30 min | 30 min |
-| 6b | AI reviewers | Play reviewer (browser, screenshots) and code reviewer (diff), one verdict, auto-fix loop (max 2) (D19). Added on top of the working loop; expect a few iterations | Claude | 10 min | 1.5–2 h |
+| 6b ✅ | AI reviewers | Play reviewer (browser, screenshots) and code reviewer (diff), one verdict, auto-fix loop (max 2) (D19). Added on top of the working loop; expect a few iterations | Claude | 10 min | 1.5–2 h |
 | 8 | Arrow path v1 | Puzzle generator + solver, ~30-level ladder, Easy/Medium/Hard starts, loops later in the ladder | Claude | — | 3–5 h |
 | 9 | Playtest | Install on the tablet, play with her, turn feedback into issues | Me | 20 min + play | — |
 | 10 | Test scaling (D20) | **When `main`'s CI passes 2m30s or at the third game:** PRs run only what they could break, shards grow with the tests, a no-cross-game-imports test | Claude | — | 1–2 h |
@@ -62,14 +62,20 @@ Notes:
     in README).
   - Not tested: `@claude` on someone else's issue (needs a second account; the workflow's `if:` blocks it and was
     reviewed). Failure notifications for builder runs (none failed).
-- Step 6b built (2026-11-14), not ticked yet: `.github/workflows/review.yml` (D15, D17, D19) with
-  `tools/review/` (scope, standard screenshots, verdict, prompts) and their unit tests. Owner decisions: keep tapping
-  Approve for each fix push; screenshots kept in the `review-screenshots` branch; proof after merge accepted (the
-  workflow only runs from `main`). It merges switched off (`AI_REVIEW`, `AI_FIX`). Proof plan, with throwaway PRs:
-  docs-only (no review), a harmless change (✅ with screenshots), planted problems (40 px button, unprefixed storage
-  key: ❌), a checklist change (banner), then `AI_FIX=on` (a fix round, approve, ✅) and an unfixable item (2 rounds,
-  `needs-you`). At least 3 green runs. The "to do in step 6b" notes below are covered by it: fix runs start from the
-  review workflow (`workflow_run`), so the fix job restores the agent files from `main` itself.
+- Step 6b done (2026-11-14): `.github/workflows/review.yml` (D15, D17, D19) with `tools/review/` (scope, standard
+  screenshots, verdict, prompts) and unit tests. Merged switched off, then proven on GitHub with throwaway PRs
+  #16–#19, #25, #26: docs-only (no review), a harmless change (✅, 3 green runs), planted bugs (❌, both caught,
+  the play reviewer really played), a checklist change (rules banner), a fix round (#18: ❌ → fix pushed → ✅), the
+  2-round limit (#25: no fix, `needs-you`), and a fix run that skipped what the owner asked for (#26).
+  - The proof found 6 real problems, fixed in #20–#24 and the clean-up PR: Claude Code needs bubblewrap for secret
+    scrubbing; `Bash(folder/:*)` rules never match a file (now `folder/*`, with a test); blocked tool calls are now
+    listed in the log; reviewer screenshots named with their folder; the fix run never saw the owner's request; a
+    skipped item made round 2 repeat itself (now: `needs-you` and no more rounds).
+  - #21's guess (full paths) was wrong. Lesson: test a permission rule locally before changing it.
+  - Fix pushes from the Claude app were **not** held for approval in the proof (they were in step 7).
+  - Switches: `AI_REVIEW=on`, `AI_FIX=off` (owner's default; switch on for automatic fixes).
+- To do: the WebKit "New!" update test (`tests/e2e/pwa.spec.js`) failed twice on 2026-11-14 with 6 CI runs at once
+  (passed on retry, so CI failed it as flaky). Make it reliable (separate PR).
 - To do in step 6b: the play reviewer runs only when a shipped file changed (`isShipped` in
   `tests/shipped-files.js`); the code reviewer runs on every non-docs PR (D19).
 - Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.

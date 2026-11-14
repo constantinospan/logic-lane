@@ -213,14 +213,17 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Max 2 automatic fix rounds per PR; then stop, add label `needs-you`, owner gets notified.
 - Rounds are counted by labels `ai-fix-1` and `ai-fix-2`, added by the workflow before the AI starts, so the limit
   never depends on what the AI writes. A fix run that pushes nothing adds `needs-you` (also done by the workflow).
-- The fix run pushes with the Claude app token, so its push starts CI. GitHub holds that run until the owner taps
-  **Approve and run workflows** ("require approval for all outside contributors" is kept, owner 2026-11-14). The
-  fix comment says so. Loosening the setting, or pushing with an owner token, were the rejected alternatives.
+- The fix run pushes with the Claude app token, so its push starts CI. "Require approval for all outside
+  contributors" is kept (owner, 2026-11-14). In step 7 GitHub held the app's pushes for an Approve tap; in the 6b
+  proof (2026-11-14) it didn't. The fix comment says to tap Approve only if GitHub asks.
+- If a fix run skips an item on purpose (e.g. it would undo what the owner asked for), the workflow adds `needs-you`
+  and uses up the remaining rounds, because another round would only skip it again (owner, 2026-11-14). The fix run
+  reports the count in `review-input/skipped-count`.
 - A review that didn't finish (a reviewer crashed or timed out) is never ✅ and never starts a fix: it's posted as
   ⚠️ with `needs-you`.
 - The fix loop is optional (owner, 2026-11-14): `AI_FIX` is **off** by default after the 6b proof. A ❌ verdict then
   ends with "comment `@claude fix the Blocking items`", and the owner switches `AI_FIX` on when they want fixes to
-  start by themselves. Reasons: plan usage, and an Approve tap per round.
+  start by themselves. Reason: plan usage.
 - The fix run gets the owner's own words (the PR description and the owner's comments), so it can skip an item that
   would undo something the owner asked for.
 

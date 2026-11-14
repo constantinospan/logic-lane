@@ -197,7 +197,7 @@ jobs:
           claude_args: >-
             --max-turns 80
             --json-schema '${{ steps.schema.outputs.json }}'
-            --allowedTools "Read,Glob,Grep,Write,Bash(node review-tmp/*),Bash(node /home/runner/work/logic-lane/logic-lane/review-tmp/*),Bash(node tools/review/shots.mjs:*),Bash(node /home/runner/work/logic-lane/logic-lane/tools/review/shots.mjs:*),Bash(node pr/tests/serve.mjs:*),Bash(node /home/runner/work/logic-lane/logic-lane/pr/tests/serve.mjs:*),Bash(git -C pr diff:*),Bash(git -C pr log:*),Bash(git -C pr show:*),Bash(ls:*)"
+            --allowedTools "Read,Glob,Grep,Write,Bash(node review-tmp/*),Bash(node tools/review/shots.mjs:*),Bash(node pr/tests/serve.mjs:*),Bash(git -C pr diff:*),Bash(git -C pr log:*),Bash(git -C pr show:*),Bash(ls:*)"
             --disallowedTools "Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
       # Which tool calls the allow-list blocked (the log is otherwise quiet: show_full_output stays off).
       - name: Blocked tool calls
@@ -453,7 +453,7 @@ jobs:
           retention-days: 14
 
   # D17: works through the Blocking items on the PR's own branch, then pushes. The push starts CI (held until the
-  # owner taps "Approve and run workflows"), and a green CI run starts this workflow again: that's round 2.
+  # owner taps "Approve and run workflows", if GitHub holds it), and a green CI run starts this workflow again: round 2.
   fix:
     needs: [gate, verdict]
     if: ${{ !cancelled() && needs.verdict.result == 'success' && needs.verdict.outputs.fix == 'true' && vars.AI_FIX == 'on' }}
@@ -599,6 +599,10 @@ jobs:
           else
             pushed=false
           fi
+          # Items the fix run left for the owner (it skipped them on purpose). Then no more automatic rounds: the next
+          # round would only skip them again.
+          skipped=$([ -f review-input/skipped-count ] && tr -dc '0-9' < review-input/skipped-count | head -c 3)
+          skipped=${skipped:-0}
           body="${RUNNER_TEMP}/fix-comment.md"
           {
             echo '## 🔧 Automatic fix round'
@@ -612,12 +616,22 @@ jobs:
             echo
             echo '---'
             if [ "$pushed" = true ]; then
-              echo "Pushed \`${now:0:7}\`. GitHub holds its tests until you approve them: open this PR in a browser" \
-                "and tap **Approve and run workflows**. The tests then run, and the review runs again after them."
+              echo "Pushed \`${now:0:7}\`. The tests run on it, then the review runs again. (If GitHub asks for" \
+                "approval on this PR, open it in a browser and tap **Approve and run workflows**.)"
             else
               echo "Nothing was pushed, so this is over to you (label \`needs-you\`). Log: ${RUN_URL}"
+            fi
+            if [ "$skipped" -gt 0 ]; then
+              echo
+              echo "${skipped} item(s) were left for you to decide, so there are no more automatic fix rounds on this" \
+                "PR (label \`needs-you\`). Comment \`@claude\` with what to do."
             fi
           } > "$body"
           gh label create needs-you --repo "$REPO" --color d93f0b --description 'Waiting for the owner' 2>/dev/null || true
           gh pr comment "$PR" --repo "$REPO" --body-file "$body"
-          if [ "$pushed" != true ]; then gh pr edit "$PR" --repo "$REPO" --add-label needs-you; fi
+          if [ "$pushed" != true ] || [ "$skipped" -gt 0 ]; then gh pr edit "$PR" --repo "$REPO" --add-label needs-you; fi
+          if [ "$skipped" -gt 0 ]; then
+            # Uses up the remaining rounds, so the re-review doesn't start another fix.
+            gh label create ai-fix-2 --repo "$REPO" --color c5def5 --description 'Automatic fix round used' 2>/dev/null || true
+            gh pr edit "$PR" --repo "$REPO" --add-label ai-fix-1 --add-label ai-fix-2
+          fi

@@ -37,9 +37,11 @@ What happens next:
    and desktop size, the other reads the code. They post **one comment**: ✅ pass, ❌ with a numbered list of what
    to fix, or ⚠️ if a reviewer didn't finish. Screenshots are in the comment, and the PR's checks list shows an
    **ai-review** line with the same result.
-   - On ❌, Claude tries to fix the list itself (up to 2 rounds). Each fix push waits for you: open the PR in a browser
-     and tap **Approve and run workflows**. The tests run, then the review runs again.
-   - After 2 rounds, or if a fix pushes nothing, or the review didn't finish, the PR gets the `needs-you` label.
+   - On ❌, if `AI_FIX` is on, Claude tries to fix the list itself (up to 2 rounds). The tests and the review then run
+     again by themselves. If GitHub asks for approval on the PR, tap **Approve and run workflows** (in a browser).
+     With `AI_FIX` off (the default), comment `@claude fix the Blocking items` when you want a fix.
+   - After 2 rounds, if a fix pushes nothing or leaves something for you to decide, or if the review didn't finish,
+     the PR gets the `needs-you` label.
      Comment `@claude` with what to do, or re-run **AI review** from the Actions tab.
    - PRs that only change docs aren't reviewed, except changes to the agent rules (`CLAUDE.md`, the checklist,
      `docs/DECISIONS.md`, `.claude/`), which always are. Those, and changes to the pipeline itself, get a ⚠️ banner
