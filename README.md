@@ -25,8 +25,12 @@ Use whichever is handy. All three end in a pull request (PR) for you to merge.
 `@claude` only works on issues and PRs you opened yourself. On anyone else's issue it does nothing.
 
 What happens next:
-1. Claude builds it on a branch and runs the tests. On GitHub it posts a **Create PR** link: tap it.
-   To watch it work, open the repo's **Actions** tab.
+1. Claude builds it on a branch and runs the tests (about 2–5 minutes). On GitHub it posts a **Create PR** link:
+   tap it, then **Create pull request**. To watch it work, open the repo's **Actions** tab.
+   - On a phone, if the **Create pull request** button doesn't show: in Safari tap **aA** → **Request Desktop
+     Website**, or open the repo in the GitHub app and use its **Compare & pull request** banner.
+   - When you ask `@claude` for changes on an open PR, GitHub holds the test run until you approve it: on the PR
+     (in a browser), tap **Approve and run workflows**.
 2. Tests run on the PR (the **test** check). A red ✗ means something broke, and the PR can't be merged until it's
    fixed. Comment `@claude fix the failing tests`. Once the AI reviewers are added (plan step 6b), they run after
    the tests pass: they play the game and post a ✅/❌ verdict with screenshots.
