@@ -22,18 +22,21 @@ Use whichever is handy. All three end in a pull request (PR) for you to merge.
 | A local Claude Code session | Open this folder and describe what you want. |
 
 ⚠️ **Issues and comments are public.** Never write her name or other personal details in them.
-⚠️ **Only use `@claude` on issues you wrote yourself.** Claude reads the whole issue, including anyone else's text.
+`@claude` only works on issues and PRs you opened yourself. On anyone else's issue it does nothing.
 
 What happens next:
 1. Claude builds it on a branch and runs the tests. On GitHub it posts a **Create PR** link: tap it.
-2. Tests run on the PR. If they pass, the AI reviewer plays the game and posts a ✅/❌ verdict with screenshots.
+   To watch it work, open the repo's **Actions** tab.
+2. Tests run on the PR (the **test** check). A red ✗ means something broke, and the PR can't be merged until it's
+   fixed. Comment `@claude fix the failing tests`. Once the AI reviewers are added (plan step 6b), they run after
+   the tests pass: they play the game and post a ✅/❌ verdict with screenshots.
    On ❌ it tries to fix things itself, up to 2 rounds, then labels the PR `needs-you`.
    - If the **tests** fail, there's no review. Comment `@claude fix the failing tests`.
    - PRs that only change docs aren't reviewed, except changes to the agent rules (`CLAUDE.md`, the checklist,
      `docs/DECISIONS.md`, `.claude/`), which always are. Read those yourself before merging too.
 3. You look at the verdict and screenshots, then **Merge**. Or comment `@claude` on the PR with what to change,
    and it updates the same PR.
-4. Merging publishes the change to the live site within a few minutes. Installed apps show a **⬆️ New!** button
+4. Merging runs the tests once more, then publishes the change to the live site within a few minutes. Installed apps show a **⬆️ New!** button
    when they're next opened. Tapping it updates, and she carries on from the same puzzle.
 
 Only the repo owner can trigger Claude. Other people's issues or comments can't start it.
@@ -57,11 +60,16 @@ Put that in the issue so Claude can recreate the exact puzzle.
   an authentication error, run `claude setup-token` in a normal terminal, then
   `gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo constantinospan/logic-lane`. Never paste the token into a chat.
 - **Usage limits:** Claude runs use the Max plan's limits. If a run fails because a limit was reached, re-run it later.
+- **If the tests themselves break** (not your change: e.g. a GitHub outage, or GitHub changes its test machines),
+  nothing can be merged, not even a revert. Settings → Branches → `main` → untick **Do not allow bypassing the
+  above settings**, merge the fix or revert, then tick it again. If only the visual snapshot pictures are off
+  after a GitHub machine change, comment `@claude` on a PR asking it to update the visual snapshots.
 - **Approvals:** you can't approve your own PRs, so never switch on "require approvals" for `main`. Merging is the
   approval.
 
 ## Running the tests
-`npm ci`, `npx playwright install chromium webkit`, then `npm run check`. Details: [docs/TESTING.md](docs/TESTING.md).
+`npm ci`, `npx playwright install chromium webkit`, then `npm run check`. GitHub runs them on every PR too.
+Details: [docs/TESTING.md](docs/TESTING.md).
 
 ## How it's built and why
 - Decisions: [docs/DECISIONS.md](docs/DECISIONS.md)

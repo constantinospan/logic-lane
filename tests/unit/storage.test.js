@@ -17,6 +17,10 @@ const record = { gameId: 'demo', gameVersion: 1, level: 3, n: 1, seed: 'aaaaaa',
 const versionOf = (id) => (id === 'demo' ? 1 : undefined);
 
 describe('storage', () => {
+  it('resumes for 3 hours, as decided (D7)', () => {
+    expect(RESUME_WINDOW_MS).toBe(3 * 60 * 60 * 1000);
+  });
+
   let backend, now, store;
   beforeEach(() => {
     backend = memoryBackend();

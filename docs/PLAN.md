@@ -10,7 +10,7 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 3 ✅ | Rulebook | `CLAUDE.md` (agent rules), `REVIEW-CHECKLIST.md`, `README.md` (rollback, token renewal) | Claude, you approve | 10 min read | 30 min |
 | 4 ✅ | Shared base | Home screen, difficulty picker, refresh protection (localStorage, 3 h resume window), seeded random, installable app, styles | Claude | — | 2–3 h |
 | 5 ✅ | Tests | Unit tests, browser tests at phone, tablet + desktop sizes, type checking | Claude | — | 1 h |
-| 6a | Core pipeline | Tests gate + deploy, builder (`@claude`), fork guards. A working request → PR → merge → live loop | Claude | — | 1–1.5 h |
+| 6a ✅ | Core pipeline | Tests gate + deploy, builder (`@claude`), fork guards. A working request → PR → merge → live loop | Claude | — | 1–1.5 h |
 | 7 | Dry run | You open a small test issue from your phone, watch it go to PR → merge → live | Both | 30 min | 30 min |
 | 6b | AI reviewers | Play reviewer (browser, screenshots) and code reviewer (diff), one verdict, auto-fix loop (max 2) (D19). Added on top of the working loop; expect a few iterations | Claude | 10 min | 1.5–2 h |
 | 8 | Arrow path v1 | Puzzle generator + solver, ~30-level ladder, Easy/Medium/Hard starts, loops later in the ladder | Claude | — | 3–5 h |
@@ -31,10 +31,6 @@ Notes:
 - Step 2 done (2026-11-13): Claude GitHub App installed on logic-lane only; secret `CLAUDE_CODE_OAUTH_TOKEN` set.
   Token created 2026-11-13, expected to expire around 2027-11 — renew with `claude setup-token` + `gh secret set`.
 - Step 3 done (2026-11-13): `CLAUDE.md`, `docs/REVIEW-CHECKLIST.md`, README. Reviewed by a fresh agent; fixes applied.
-- To do in step 6a: allow the builder to run the test, type-check and browser-test commands (`claude_args: --allowedTools ...`)
-  and install Playwright browsers in the job, so it can run checks before pushing.
-- To do in step 6a: allow `Bash(git revert:*)` for the builder (via `claude_args: --allowedTools`) and check out with `fetch-depth: 0`, so
-  "`@claude` revert PR #N" works. Test it in the step 7 dry run.
 - Step 4 done: shared base, hidden demo game (`#/play/demo`), `docs/GAME-API.md`. Decided: one 🔊 in the top bar
   (D10), seed on long-press (D12), content-hash cache version stamped by deploy (D8, D16), parent-only reset (D16).
 - Step 5 done: `npm run check` = `tsc` (strict `checkJs`, separate WebWorker config for `sw.js`) + Vitest + Playwright
@@ -45,20 +41,20 @@ Notes:
   It found and fixed a low-contrast "Soon" badge, and (via review) a real bug: with storage blocked or full the game
   couldn't be played. It now falls back to memory (D7). New tests were mutation-checked; ones that couldn't fail
   were strengthened.
-- To do in step 6a: visual snapshot tests (Playwright `toHaveScreenshot`) of every screen at all three sizes.
-  Baselines are recorded on GitHub's Linux machines (they differ by OS), stored in the repo, and updated only
-  on purpose.
-- To do in step 6a: CI on Node 24: `npm ci`, `npx playwright install --with-deps chromium webkit`, `npm run check`.
-  That job is the required status check on `main`. Upload the Playwright report on failure.
-- To do in step 6a: the deploy job writes a hash of the shipped files (`tests/shipped-files.js`, plus `sw.js`
-  with VERSION blanked) into `VERSION` in `sw.js`, and nothing else.
+- Step 6a done: `.github/workflows/ci.yml` (the `test` check on every PR and on `main`, then deploy to Pages with the
+  content-hash `VERSION` from `tools/build-site.mjs` and a live check) and `.github/workflows/claude.yml` (the
+  builder, owner-only on the owner's own issues and PRs). Visual snapshots of every screen, Linux pictures, run in CI
+  and the builder only. After merge: `test` is a required check on `main`, enforced for admins.
+- To check in step 7: `@claude` from an issue works end to end (branch, checks, Create PR link); its push triggers
+  CI; `@claude revert PR #N`; the `Bash(... :*)` pre-approved commands work; a failed run notifies the owner;
+  `@claude` on someone else's issue does nothing.
 - To do in step 6b: the play reviewer runs only when a shipped file changed (`isShipped` in
   `tests/shipped-files.js`); the code reviewer runs on every non-docs PR (D19).
 - Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.
+- Check in step 9 on the real iPad: a first visit shows no "⬆️ New!" banner. In 6a, WebKit on Linux once showed
+  the banner in an unrelated visual test (cause unknown; visual tests now run without the service worker).
 - Check in step 9 on the real iPad: the 3 s holds (home title, Reset) and the seed long-press aren't cancelled by
   iOS. They're tested in Chromium and WebKit with a mouse, but not yet with real touch on iOS.
-- To do in step 6a: set `include_comments_by_actor: constantinospan`, so Claude only reads the owner's comments
-  (D15). Until then, the README's "anyone else's comments are ignored" only covers triggering.
 - To do in step 6b: the reviewer and fix runs load `CLAUDE.md` and `docs/REVIEW-CHECKLIST.md` from `main`
   (the base branch), not the PR branch, so a PR can't change the rules it's judged by. The action already does
   this for `CLAUDE.md` and `.claude/`. The checklist (in `docs/`) must be read from `main` explicitly. The verdict flags any PR that
@@ -75,5 +71,3 @@ Notes:
   and fix runs couldn't run checks there. In that case, sessions should push the branch and let the owner open the PR.
 - To decide in step 6b: how fix runs start. If not tied to the PR (e.g. `workflow_dispatch`), there's no
   `.claude-pr/` restore; check `CLAUDE.md`'s "Staging changes, and rule files on PR runs" section still fits.
-- To do in step 6a: make the test job a required status check on `main`, then enforce the rules for admins too
-  (left off for now so setup can bootstrap).

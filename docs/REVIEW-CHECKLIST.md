@@ -83,6 +83,8 @@ The AI reviewer checks every PR against this list, and builders use it while wor
       upgraded package is named in the PR description.
 - [ ] Saving goes through the shared storage module.
 - [ ] New or changed logic has tests, and all checks pass.
+- [ ] Changed visual snapshot pictures (`tests/e2e/visual.spec.js-snapshots/`) match a visual change the request
+      asked for, and the PR lists them with the reason. Unexplained picture changes are Blocking.
 
 ## 6. Rule changes (PRs that change `CLAUDE.md`, this checklist, `docs/DECISIONS.md` or `.claude/`)
 - [ ] Compare the PR's version with `main`'s (use `git diff origin/main...HEAD`):
