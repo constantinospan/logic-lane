@@ -5,7 +5,6 @@ const PORT = 4174; // not 4173 (used for manual play), so a stray server never g
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
-  workers: process.env.CI ? '100%' : undefined, // CI machines: every core (Playwright's default is half)
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: Boolean(process.env.CI), // a test that only passes on retry still fails the run

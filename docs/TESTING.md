@@ -8,7 +8,7 @@ npm run check                                 # type check + unit tests + browse
 ```
 `npm run check` is what agents run before pushing. CI (`.github/workflows/ci.yml`) runs the same checks on every PR
 and on `main` before deploying, split across machines working at the same time: type check and unit tests on one,
-browser tests shared out over three (`--shard=1/3` etc., every core in use). Its `test` job passes only if all of
+browser tests shared out over three (`--shard=1/3` etc.). Its `test` job passes only if all of
 them passed, and must pass before a PR can merge. When something fails, the run page has a `test-report-<n>`
 download with the Playwright report and the pictures of what went wrong.
 
