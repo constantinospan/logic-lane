@@ -52,7 +52,7 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 - [ ] Every screen with an instruction has the 🔊 in the top bar, and tapping it calls the browser's speech
       feature with that instruction. (Headless browsers usually have no voices, so check the call, not the sound.)
 - [ ] Text uses short, simple English words.
-- [ ] *(suggestion)* Sentences are about 6 words or fewer.
+- [ ] *(suggestion)* Sentences are about 8 words or fewer.
 - [ ] Tap targets are at least 64×64 CSS px, with at least 8 px between them.
 - [ ] A wrong move never ends the game or loses the level. A retry is one tap away.
 - [ ] Success shows a clear celebration.
