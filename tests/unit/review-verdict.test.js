@@ -204,6 +204,17 @@ describe('screenshots', () => {
     expect(c.match(/phone-home\.png"/g)?.length).toBe(2); // link + img, once in the table only
   });
 
+  it("accepts the reviewer's file with the review-shots/ folder in front (seen in the 6b proof)", () => {
+    const play = {
+      needed: true,
+      job: 'success',
+      json: result({ screenshots: [{ file: 'review-shots/extra-tap.png', caption: 'Tap target' }] }),
+    };
+    const c = buildVerdict(input({ play, report, shotFiles: files, shotsBase: base })).comment;
+    expect(c).toContain(`src="${base}extra-tap.png"`);
+    expect(c).not.toContain('review-shots/extra-tap.png');
+  });
+
   it('no published pictures: no screenshot section, no broken images', () => {
     expect(buildVerdict(input({ report, shotFiles: files, shotsBase: '' })).comment).not.toContain('Screenshots');
     expect(buildVerdict(input({ report, shotFiles: [], shotsBase: base })).comment).not.toContain('<img');
