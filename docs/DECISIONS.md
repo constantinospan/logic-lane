@@ -90,8 +90,10 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
   machine's fonts, so they run only with `VISUAL=1`, on one pinned machine (`ubuntu-24.04`, same setup in CI and the
   builder). Missing pictures fail in CI (never written quietly), and a test that only passes on retry fails the run.
   Pictures change only for an intended visual change.
-- CI (`.github/workflows/ci.yml`): Node 24, `npm ci`, Playwright browsers, `npm run check`. Its `test` job is the
-  required check on `main`, enforced for admins too. If CI itself breaks, the owner can briefly allow bypassing
+- CI (`.github/workflows/ci.yml`): Node 24, `npm ci`, Playwright browsers, the same checks as `npm run check`,
+  split for speed: type check + unit tests on one machine, browser tests in 3 shards (all cores), all at once. A
+  final `test` job (passes only if every part passed; it runs even when a part fails, because GitHub would count a
+  skipped required check as passed) is the required check on `main`, enforced for admins too. If CI itself breaks, the owner can briefly allow bypassing
   (README).
 - Rejected: Vite+TypeScript, Svelte (build step not worth it at this size), game engines (too heavy for grid puzzles).
 

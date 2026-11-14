@@ -6,9 +6,11 @@ npm ci                                        # once, or after package.json chan
 npx playwright install chromium webkit        # once, downloads the test browsers
 npm run check                                 # type check + unit tests + browser tests
 ```
-`npm run check` is what agents run before pushing, and what CI (`.github/workflows/ci.yml`) runs on every PR and
-on `main` before deploying. CI's `test` job must pass before a PR can merge. When it fails, the run page has a
-`test-report` download with the Playwright report and the pictures of what went wrong.
+`npm run check` is what agents run before pushing. CI (`.github/workflows/ci.yml`) runs the same checks on every PR
+and on `main` before deploying, split across machines working at the same time: type check and unit tests on one,
+browser tests shared out over three (`--shard=1/3` etc., every core in use). Its `test` job passes only if all of
+them passed, and must pass before a PR can merge. When something fails, the run page has a `test-report-<n>`
+download with the Playwright report and the pictures of what went wrong.
 
 Individual parts:
 - `npm run typecheck`
