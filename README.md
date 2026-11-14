@@ -60,8 +60,13 @@ Put that in the issue so Claude can recreate the exact puzzle.
 - **Approvals:** you can't approve your own PRs, so never switch on "require approvals" for `main`. Merging is the
   approval.
 
+## Running the tests
+`npm ci`, `npx playwright install chromium webkit`, then `npm run check`. Details: [docs/TESTING.md](docs/TESTING.md).
+
 ## How it's built and why
 - Decisions: [docs/DECISIONS.md](docs/DECISIONS.md)
 - Build plan and progress: [docs/PLAN.md](docs/PLAN.md)
 - Review checklist: [docs/REVIEW-CHECKLIST.md](docs/REVIEW-CHECKLIST.md)
 - Rules for AI agents: [CLAUDE.md](CLAUDE.md)
+- Adding a game: [docs/GAME-API.md](docs/GAME-API.md)
+- Testing: [docs/TESTING.md](docs/TESTING.md)

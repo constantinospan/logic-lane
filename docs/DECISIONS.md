@@ -77,7 +77,10 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
 - Shipped files = repo files. No framework. One exception: the deploy job writes `VERSION` in `sw.js` (D16), and
   nothing else.
 - Type checking via JSDoc comments checked by TypeScript in CI (no compilation).
-- Dev tooling only for checks: unit tests (Vitest), browser tests (Playwright, phone + tablet + desktop sizes). Runs in CI before deploy.
+- Dev tooling only for checks, pinned exactly: Vitest 4.1.12 (unit), Playwright 1.64.1 (browser), TypeScript 6.0.3
+  (`checkJs`; 6.x is the last JS-based compiler). `npm run check` runs everything; CI runs it before deploy on Node 24.
+- Browser tests: phone (Chromium, 390×844, touch), tablet (**WebKit**, Safari's engine, 820×1180, touch), desktop
+  (Chromium, 1280×800). See `docs/TESTING.md`.
 - Rejected: Vite+TypeScript, Svelte (build step not worth it at this size), game engines (too heavy for grid puzzles).
 
 ### D9. Installable app (PWA)
@@ -133,7 +136,7 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Branch protection on `main`: tests must pass before merge.
 - Squash merges only (merge commits and rebase merging are off): one commit per PR, so reverting is always one step.
 - Reviewer is a separate run with a strict, critical prompt and checklist; the parent is the final judge.
-- Quota: runs share the owner's Max limits. Reviewer runs only after tests pass; skip it for docs-only changes.
+- Quota: runs share the owner's Max limits. Reviewers run only after tests pass. What runs when is set by D19.
   `CLAUDE.md`, `docs/REVIEW-CHECKLIST.md`, `docs/DECISIONS.md` and `.claude/` never count as docs-only: they're always reviewed.
 
 ### D16. Second review round
@@ -165,3 +168,15 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 ### D18. Child privacy in a public repo
 - Never put the child's name, photos, school or other identifying details in the repo, issues, PRs or screenshots.
 - Added to the agent rules and the review checklist.
+
+### D19. Two AI reviewers on GitHub: play and code (decided 2026-11-13, built in plan step 6b)
+- **Play reviewer:** opens the PR's site in a browser at phone, tablet and desktop sizes, plays the changed game and
+  posts screenshots. Owns checklist §1, §2, the *(play)* items of §3, and §4. Runs only when shipped files changed
+  (`tests/shipped-files.js`).
+- **Code reviewer:** reads the PR's changes, no browser. Looks for bugs, edge cases, offline/update logic and rule
+  breaks. Owns the *(code)* items of §3, §5 and §6. Runs on every PR except docs-only ones (rule files always count).
+- Why both: PR #2's review found 4 code-level bugs (e.g. an update could cache old files) that neither tests nor
+  playing would catch.
+- Both write into one ✅/❌ verdict. The automatic fix loop works from the combined Blocking list (max 2 rounds, D17).
+- Until 6b exists, a fresh agent reviews each PR by hand before it's handed to the owner.
+
