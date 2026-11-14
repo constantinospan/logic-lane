@@ -139,9 +139,9 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
   issues and PRs `constantinospan` opened, so Claude never reads a stranger's issue text. One run per issue or PR
   at a time. Pinned to an action release at least 2 weeks old (full commit SHA), like every other action.
 - Builder settings: `include_comments_by_actor: constantinospan`; full history (for revert); same machine and
-  browsers as CI (`VISUAL=1`); `actions: read` so it can read failed CI logs; pre-approved commands for the checks,
-  `npx playwright test` and `git revert`. Pre-approved commands are a convenience, not a sandbox: the action's own
-  safety review handles anything else. Owner-only triggering is the real boundary.
+  browsers as CI (`VISUAL=1`); `actions: read` so it can read failed CI logs; an allow-list of shell commands (the
+  checks, `npx playwright test`, `git revert`, read-only git). Anything not on the list is denied (the action runs
+  without a way to ask), so widen the list if the builder gets stuck. Owner-only triggering is the main boundary.
 - Install via the Claude GitHub App (`/install-github-app`). Its pushes trigger other workflows; the default
   GITHUB_TOKEN would NOT, so never rely on GITHUB_TOKEN for pushes that must trigger review/deploy.
 - The action pushes a branch and posts a "Create PR" link (one tap); it does not open PRs itself by default.

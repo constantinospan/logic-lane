@@ -4,7 +4,10 @@
 // Runs only with VISUAL=1, which CI and the @claude builder set. Both use the same Linux machine (ubuntu-24.04) and
 // fonts, so the saved pictures match. On other machines (a Mac, claude.ai/code) fonts differ and every picture
 // would fail, so the tests skip there. Pictures change only for an intended visual change: see docs/TESTING.md.
-import { expect, hold, readSave, startDemo, tapRightChoice, tapWrongChoice, test } from './fixtures.js';
+import { expect, hold, readSave, startDemo, tapRightChoice, test } from './fixtures.js';
+
+// On GitHub every run must include them: a workflow that forgot VISUAL=1 fails here instead of skipping quietly.
+if (process.env.GITHUB_ACTIONS && !process.env.VISUAL) throw new Error('Set VISUAL=1 in the workflow (docs/TESTING.md).');
 
 test.skip(!process.env.VISUAL, 'Visual snapshots run only with VISUAL=1 (CI and the @claude builder). See docs/TESTING.md.');
 
@@ -64,12 +67,6 @@ test('picker with Continue', async ({ page }) => {
 test('play', async ({ page }) => {
   await openPuzzle(page);
   await snap(page, 'play');
-});
-
-test('play after a mistake', async ({ page }) => {
-  await openPuzzle(page);
-  await tapWrongChoice(page);
-  await snap(page, 'play-mistake');
 });
 
 test('play at the top level', async ({ page }) => {

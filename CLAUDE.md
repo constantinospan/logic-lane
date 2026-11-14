@@ -90,7 +90,7 @@ automatic fix runs, claude.ai/code sessions and local sessions.
      Elsewhere they skip; say so in the PR. Update the pictures (`npx playwright test tests/e2e/visual.spec.js
      --update-snapshots`, on the builder only) **only** when the change is meant to look different. Look at each
      new picture, and list which ones changed and why in the PR. Never update them just to make a failing check
-     pass. A new screen or game adds its own snapshots.
+     pass, unless the owner asks (e.g. after GitHub changes its machines and every picture shifts slightly). A new screen or game adds its own snapshots.
 5. **Hand-off:**
    - The GitHub builder posts the **Create PR** link.
    - Sessions open the PR if they can; otherwise they give the owner the link to create it.

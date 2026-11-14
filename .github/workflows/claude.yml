@@ -23,13 +23,14 @@ permissions:
   id-token: write
   actions: read
 
-# One run per issue or PR at a time, so two requests never push to the same branch at once.
-concurrency:
-  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   claude:
+    # One run per issue or PR at a time, so two requests never push to the same branch at once. Set on the job, not
+    # the workflow: skipped runs (anyone else's comment, the app's own comments) then never join the queue, so they
+    # can't cancel a waiting @claude request.
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
     if: >-
       github.actor == 'constantinospan' && (
         (github.event_name == 'issue_comment'
@@ -67,6 +68,7 @@ jobs:
           include_comments_by_actor: constantinospan
           additional_permissions: |
             actions: read
-          # Pre-approved commands (not a sandbox: other commands go through the action's own safety review).
+          # The only shell commands Claude may run (plus the action's own git and file tools). Anything else is
+          # denied, so add a command here if the builder keeps getting stuck without it.
           claude_args: >-
-            --allowedTools "Bash(npm ci),Bash(npm run check),Bash(npm test:*),Bash(npm run typecheck),Bash(npm run test:e2e:*),Bash(npx playwright test:*),Bash(git revert:*),Bash(git log:*),Bash(git status),Bash(git diff:*)"
+            --allowedTools "Bash(npm ci),Bash(npm run check),Bash(npm test:*),Bash(npm run typecheck),Bash(npm run test:e2e:*),Bash(npx playwright test:*),Bash(npx vitest:*),Bash(node tools/build-site.mjs:*),Bash(git revert:*),Bash(git log:*),Bash(git show:*),Bash(git fetch:*),Bash(git status),Bash(git diff:*)"
