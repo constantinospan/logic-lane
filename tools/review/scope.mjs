@@ -10,7 +10,13 @@ import { pathToFileURL } from 'node:url';
 import { isShipped } from '../../tests/shipped-files.js';
 
 /** Rule files: never docs-only, always reviewed (D15). */
-const RULE_FILES = ['CLAUDE.md', 'docs/REVIEW-CHECKLIST.md', 'docs/DECISIONS.md'];
+const RULE_FILES = [
+  'CLAUDE.md',
+  'docs/REVIEW-CHECKLIST.md',
+  'docs/DECISIONS.md',
+  'docs/IDEA-CHECKLIST.md',
+  'tools/idea/settings.json',
+];
 const RULE_FOLDERS = ['.claude/'];
 
 /**
@@ -26,7 +32,7 @@ const STEERING_FILES = [
   'CLAUDE.local.md',
   'tests/shipped-files.js',
 ];
-const STEERING_FOLDERS = [...RULE_FOLDERS, '.husky/', '.github/', 'tools/review/'];
+const STEERING_FOLDERS = [...RULE_FOLDERS, '.husky/', '.github/', 'tools/review/', 'tools/idea/'];
 
 /**
  * @param {string} file  Repo-relative path.

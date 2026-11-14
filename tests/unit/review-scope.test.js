@@ -25,7 +25,17 @@ describe('docs-only', () => {
   );
 
   // D15: the rule files steer every agent run, so they're always reviewed.
-  it.each(['CLAUDE.md', 'docs/REVIEW-CHECKLIST.md', 'docs/DECISIONS.md', '.claude/settings.json', '.claude/x.md'])(
+  it.each([
+    'CLAUDE.md',
+    'docs/REVIEW-CHECKLIST.md',
+    'docs/DECISIONS.md',
+    '.claude/settings.json',
+    '.claude/x.md',
+    // D21: the idea gate's checklist, pass mark and reviewer.
+    'docs/IDEA-CHECKLIST.md',
+    'tools/idea/settings.json',
+    '.claude/agents/idea-reviewer.md',
+  ])(
     '%s is a rule file, never docs-only',
     (f) => {
       expect(isRuleFile(f)).toBe(true);
@@ -38,6 +48,12 @@ describe('docs-only', () => {
     (f) => expect(isDocsOnly(f)).toBe(false),
   );
 });
+
+// D21: the idea gate's scripts steer agents, so changes to them get the rules banner.
+it.each(['tools/idea/score.mjs', 'tools/idea/route.mjs', 'tools/idea/settings.json', 'docs/IDEA-CHECKLIST.md'])(
+  '%s gets the rules banner',
+  (f) => expect(isSteering(f)).toBe(true),
+);
 
 describe('classify', () => {
   it('docs-only PR: no reviewer', () => {

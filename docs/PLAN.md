@@ -13,6 +13,7 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 6a ✅ | Core pipeline | Tests gate + deploy, builder (`@claude`), fork guards. A working request → PR → merge → live loop | Claude | — | 1–1.5 h |
 | 7 ✅ | Dry run | You open a small test issue from your phone, watch it go to PR → merge → live | Both | 30 min | 30 min |
 | 6b ✅ | AI reviewers | Play reviewer (browser, screenshots) and code reviewer (diff), one verdict, auto-fix loop (max 2) (D19). Added on top of the working loop; expect a few iterations | Claude | 10 min | 1.5–2 h |
+| 6c | Idea gate (D21) | Every request is reviewed by an idea reviewer before any code is written, on GitHub and in sessions. A pass carries on as usual; a fail asks the owner questions. Score worked out by a tested script, pass mark in a repo file | Claude | 10 min | 1.5–2 h |
 | 8 | Arrow path v1 | Puzzle generator + solver, ~30-level ladder, Easy/Medium/Hard starts, loops later in the ladder | Claude | — | 3–5 h |
 | 9 | Playtest | Install on the tablet, play with her, turn feedback into issues | Me | 20 min + play | — |
 | 10 | Test scaling (D20) | **When `main`'s CI passes 2m30s or at the third game:** PRs run only what they could break, shards grow with the tests, a no-cross-game-imports test | Claude | — | 1–2 h |
@@ -74,6 +75,13 @@ Notes:
   - #21's guess (full paths) was wrong. Lesson: test a permission rule locally before changing it.
   - Fix pushes from the Claude app were **not** held for approval in the proof (they were in step 7).
   - Switches: `AI_REVIEW=on`, `AI_FIX=off` (owner's default; switch on for automatic fixes).
+- Step 6c built (2026-11-14), not yet proven: the idea gate (D21). `claude.yml` now runs `route` (no AI) →
+  `idea-review` (AI, read-only, no shell) → `idea-verdict` (script) → builder. Files: `.claude/agents/idea-reviewer.md`,
+  `docs/IDEA-CHECKLIST.md`, `tools/idea/` (settings, score, route, collect, schema), a step 0 for sessions in
+  `CLAUDE.md`. Merged with `enabled: false`. To prove on GitHub after merge (switch on with a small PR): a pass, a
+  fail, an answer that leads to a pass, `go anyway`, `revert PR #N`, `@claude` on an open PR, a crashed reviewer
+  (⚠️ + `needs-you`), and a PR that sets `passMark: 0` still judged at 75. Also check the builder still gets the
+  action's own instructions when the idea report is added with `--append-system-prompt` (PR #30 review). Tick 6c only after.
 - Fixed (2026-11-14): the WebKit "New!" update test failed twice in CI. Reproduced in Linux WebKit (Playwright's
   Docker image): 3 of 150 taps on "New!" did nothing, because WebKit lost the "take over" message. The app now
   sends it again every second until the new version takes over (`js/pwa/update.js`). Proven: 300 of 300 passed after
