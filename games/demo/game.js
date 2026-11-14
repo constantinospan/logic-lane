@@ -1,5 +1,5 @@
 // Hidden demo game: "tap the matching picture". It exists to exercise the shared base (ladder, seeds,
-// resume, celebration, speaker) for tests and the AI reviewer. Not shown on the home screen.
+// resume, celebration, speaker) for tests and the AI reviewers. Not shown on the home screen.
 
 /** @typedef {{ emoji: string, word: string }} Thing */
 
