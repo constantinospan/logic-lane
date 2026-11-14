@@ -18,6 +18,15 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 9 | Playtest | Install on the tablet, play with her, turn feedback into issues | Me | 20 min + play | — |
 | 10 | Test scaling (D20) | **When `main`'s CI passes 2m30s or at the third game:** PRs run only what they could break, shards grow with the tests, a no-cross-game-imports test | Claude | — | 1–2 h |
 
+**Optional, later: more ways to start work on GitHub.** Today a session can open the issue for you (`CLAUDE.md`,
+"Opening issues for the owner"), so you don't type it and nothing is pushed from the Mac. These go further, if wanted:
+
+| # | Option | What happens | Your time | Claude's time |
+|---|--------|--------------|-----------|---------------|
+| O1 | Run button | A manual trigger on the builder (`claude.yml`) with a box for the request, started from the Actions tab or `gh workflow run`. No issue thread, so less history and no clean place for questions. After 6c, so the idea gate covers it | 5 min | ~1 h |
+| O2 | Cloud session | Start a claude.ai/code session from the Claude app: it works on a branch in the cloud and opens the PR. Nothing to build; on first use, run the "first time a claude.ai/code session is used" checks in the progress notes | 15 min | ~30 min |
+| O3 | Scheduled agent | A routine that picks the next issue labelled `ready`, with rules for what it may pick and a cap on runs to protect the Max quota. After 6c and step 8 | 15 min | 1.5–2 h |
+
 **Totals (rough):** you ~1.5 h spread across steps 1, 2, 3, 7, 9; Claude ~1.5–2 days of work sessions.
 
 Notes:
