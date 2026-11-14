@@ -62,6 +62,14 @@ Notes:
     in README).
   - Not tested: `@claude` on someone else's issue (needs a second account; the workflow's `if:` blocks it and was
     reviewed). Failure notifications for builder runs (none failed).
+- Step 6b built (2026-11-14), not ticked yet: `.github/workflows/review.yml` (D15, D17, D19) with
+  `tools/review/` (scope, standard screenshots, verdict, prompts) and their unit tests. Owner decisions: keep tapping
+  Approve for each fix push; screenshots kept in the `review-screenshots` branch; proof after merge accepted (the
+  workflow only runs from `main`). It merges switched off (`AI_REVIEW`, `AI_FIX`). Proof plan, with throwaway PRs:
+  docs-only (no review), a harmless change (✅ with screenshots), planted problems (40 px button, unprefixed storage
+  key: ❌), a checklist change (banner), then `AI_FIX=on` (a fix round, approve, ✅) and an unfixable item (2 rounds,
+  `needs-you`). At least 3 green runs. The "to do in step 6b" notes below are covered by it: fix runs start from the
+  review workflow (`workflow_run`), so the fix job restores the agent files from `main` itself.
 - To do in step 6b: the play reviewer runs only when a shipped file changed (`isShipped` in
   `tests/shipped-files.js`); the code reviewer runs on every non-docs PR (D19).
 - Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.

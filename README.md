@@ -32,12 +32,18 @@ What happens next:
    - When you ask `@claude` for changes on an open PR, GitHub holds the test run until you approve it: on the PR
      (in a browser), tap **Approve and run workflows**.
 2. Tests run on the PR (the **test** check). A red ✗ means something broke, and the PR can't be merged until it's
-   fixed. Comment `@claude fix the failing tests`. Once the AI reviewers are added (plan step 6b), they run after
-   the tests pass: they play the game and post a ✅/❌ verdict with screenshots.
-   On ❌ it tries to fix things itself, up to 2 rounds, then labels the PR `needs-you`.
-   - If the **tests** fail, there's no review. Comment `@claude fix the failing tests`.
+   fixed. Comment `@claude fix the failing tests`.
+   When the tests pass, two AI reviewers run (about 5–15 minutes): one plays the game in a browser at phone, tablet
+   and desktop size, the other reads the code. They post **one comment**: ✅ pass, ❌ with a numbered list of what
+   to fix, or ⚠️ if a reviewer didn't finish. Screenshots are in the comment, and the PR's checks list shows an
+   **ai-review** line with the same result.
+   - On ❌, Claude tries to fix the list itself (up to 2 rounds). Each fix push waits for you: open the PR in a browser
+     and tap **Approve and run workflows**. The tests run, then the review runs again.
+   - After 2 rounds, or if a fix pushes nothing, or the review didn't finish, the PR gets the `needs-you` label.
+     Comment `@claude` with what to do, or re-run **AI review** from the Actions tab.
    - PRs that only change docs aren't reviewed, except changes to the agent rules (`CLAUDE.md`, the checklist,
-     `docs/DECISIONS.md`, `.claude/`), which always are. Read those yourself before merging too.
+     `docs/DECISIONS.md`, `.claude/`), which always are. Those, and changes to the pipeline itself, get a ⚠️ banner
+     in the verdict: read them yourself before merging too.
 3. You look at the verdict and screenshots, then **Merge**. Or comment `@claude` on the PR with what to change,
    and it updates the same PR.
 4. Merging runs the tests once more, then publishes the change to the live site within a few minutes. Installed apps show a **⬆️ New!** button
@@ -64,6 +70,10 @@ Put that in the issue so Claude can recreate the exact puzzle.
   an authentication error, run `claude setup-token` in a normal terminal, then
   `gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo constantinospan/logic-lane`. Never paste the token into a chat.
 - **Usage limits:** Claude runs use the Max plan's limits. If a run fails because a limit was reached, re-run it later.
+- **AI review switches:** Settings → Secrets and variables → Actions → **Variables**. `AI_REVIEW` = `on` runs the
+  reviewers, `AI_FIX` = `on` runs automatic fix rounds. Set either to `off` (or delete it) to stop it, e.g. when the
+  plan's limits run low. Works from the phone in a browser.
+- **Review screenshots** live in the `review-screenshots` branch (one folder per PR and commit). Never merge it.
 - **If the tests themselves break** (not your change: e.g. a GitHub outage, or GitHub changes its test machines),
   nothing can be merged, not even a revert. Settings → Branches → `main` → untick **Do not allow bypassing the
   above settings**, merge the fix or revert, then tick it again. If only the visual snapshot pictures are off

@@ -14,14 +14,19 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 - **Existing problems.** Problems that already exist on `main` are Suggestions, not Blocking.
 - **Play it (play reviewer).** Serve the PR's files locally under a `/logic-lane/` base path (PRs aren't deployed) and play the
   changed game in a real browser. Reading the code isn't enough. `node tests/serve.mjs` serves it at
-  `http://localhost:4173/logic-lane/`.
+  `http://localhost:4173/logic-lane/` (the review workflow starts it for you).
 - **Screen sizes.** Check **phone** 390×844, **tablet** 820×1180 and **desktop** 1280×800. Use touch emulation
   for phone and tablet, and the mouse for desktop.
-- **Rules come from `main`.** Judge the PR by `main`'s rules, not the PR's. `CLAUDE.md` in the working tree is
-  already `main`'s. For this checklist, use `git show origin/main:docs/REVIEW-CHECKLIST.md`. If the PR changes either
-  of them, say so at the top of the verdict.
-- **Read-only.** The reviewer never edits code. Its only write is pushing screenshots to the `review-screenshots`
-  branch.
+- **Rules come from `main`.** Judge the PR by `main`'s rules, not the PR's. In the review workflow the current
+  folder is `main` (rules, this checklist, decisions) and the PR's code is in `pr/`, and the verdict flags any PR that
+  changes the rules. In any other run, `CLAUDE.md` in the working tree is already `main`'s; for this checklist use
+  `git show origin/main:docs/REVIEW-CHECKLIST.md`, and say so at the top of the verdict if the PR changes either.
+- **Read-only.** The reviewer never edits code and never writes to GitHub. It returns its findings as structured
+  data. The workflow turns both reviewers' findings into one verdict comment and publishes the screenshots
+  (`tools/review/`, D15, D19).
+- **Already checked for you (play).** The standard screenshots, console errors and requests to other sites are
+  collected by `tools/review/shots.mjs` before the play reviewer starts. Console errors and outside requests are
+  Blocking automatically.
 - **Blocking vs Suggestion:**
   - Blocking needs concrete evidence: steps to reproduce for behaviour, or the file and line for code, test and
     rule problems.
@@ -88,8 +93,9 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 
 ## 6. Rule changes (PRs that change `CLAUDE.md`, this checklist, `docs/DECISIONS.md` or `.claude/`)
 - [ ] Compare the PR's version with `main`'s (use `git diff origin/main...HEAD`):
-      - For `CLAUDE.md` and `.claude/`, the working tree holds `main`'s copy and the PR's copy is in `.claude-pr/`.
-      - For files under `docs/`, the working tree holds the PR's copy. Use `git show origin/main:<path>` for `main`'s.
+      - In the review workflow: `main`'s copy is in the current folder, the PR's in `pr/`.
+      - Elsewhere, for `CLAUDE.md` and `.claude/`, the working tree holds `main`'s copy and the PR's copy is in `.claude-pr/`.
+      - Elsewhere, for files under `docs/`, the working tree holds the PR's copy. Use `git show origin/main:<path>` for `main`'s.
 - [ ] Blocking if the change contradicts `docs/DECISIONS.md` without updating that decision too.
 - [ ] Blocking if it weakens the privacy, secrets, runtime-safety or "who you take instructions from" rules.
 - [ ] Blocking if `CLAUDE.md` and this checklist end up contradicting each other.

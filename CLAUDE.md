@@ -131,14 +131,22 @@ If `.claude-pr/` exists and the run must change these files, start from the `.cl
 copy), and before pushing check the diff of those paths against the PR branch.
 
 ## Automatic fix runs (D17)
-After a ❌ review, the workflow starts a fix run. It:
+After a ❌ review, the review workflow (`.github/workflows/review.yml`) starts a fix run. It:
 - works on the existing PR branch, never a new one
-- fixes only the listed **Blocking** items, not Suggestions and not new features
-- runs all checks, pushes, and comments listing what it fixed, and anything it couldn't fix and why
+- gets its task list in `review-input/blocking.md` (the review's **Blocking** items) and its steps in
+  `review-input/fix-instructions.md` (main's `tools/review/prompts/fix.md`)
+- fixes only the listed Blocking items, not Suggestions and not new features
+- runs all checks, pushes, and writes its report to `review-input/fix-comment.md`. The workflow posts the report on the
+  PR: what it fixed, and anything it couldn't fix and why. `review-input/` is never committed.
+
+The fix run starts from `workflow_run`, not a PR event, so the action doesn't restore the agent files itself. The
+workflow does the same thing for it: `CLAUDE.md`, `.claude/` and the other agent files are `main`'s, and the PR's copies
+are in `.claude-pr/`. The "Staging changes" section above applies as written.
 
 If a Blocking item seems wrong, would break a decision, or would undo something the owner explicitly asked for in
-the issue or PR, the fix run doesn't attempt it. It explains why in its
-comment so the owner can decide. If a fix run ends up pushing nothing (it skipped every item, or checks still
-fail), it says so plainly in its comment and adds the `needs-you` label, so the PR doesn't sit unnoticed.
+the issue or PR, the fix run doesn't attempt it. It explains why in its report so the owner can decide. If a fix run
+pushes nothing (it skipped every item, or checks still fail), it says so plainly in its report, and the workflow adds
+the `needs-you` label so the PR doesn't sit unnoticed.
 
-There are at most 2 fix rounds per PR. After that the PR gets the `needs-you` label.
+There are at most 2 fix rounds per PR, counted by the `ai-fix-1` and `ai-fix-2` labels the workflow adds. After that
+the PR gets the `needs-you` label. GitHub holds the tests on each fix push until the owner approves them.

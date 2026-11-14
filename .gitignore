@@ -14,3 +14,8 @@ CLAUDE.local.md
 blob-report/
 
 _site/
+
+# AI review scratch folders (tools/review)
+review-tmp/
+review-shots/
+review-input/
