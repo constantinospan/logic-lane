@@ -78,7 +78,10 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
   nothing else.
 - Type checking via JSDoc comments checked by TypeScript in CI (no compilation).
 - Dev tooling only for checks, pinned exactly: Vitest 4.1.12 (unit), Playwright 1.64.1 (browser), TypeScript 6.0.3
-  (`checkJs`; 6.x is the last JS-based compiler). `npm run check` runs everything; CI runs it before deploy on Node 24.
+  (`checkJs`; 6.x is the last JS-based compiler), @vitest/coverage-v8 4.1.12 (coverage), @axe-core/playwright
+  4.14.0 (accessibility). The owner wants as many tests as possible.
+- Coverage minimum: the shared core (`js/core/`) stays at 100% of lines, statements and functions, and 95% of
+  branches. `npm test` fails below that. `npm run check` runs everything; CI runs it before deploy on Node 24.
 - Browser tests: phone (Chromium, 390×844, touch), tablet (**WebKit**, Safari's engine, 820×1180, touch), desktop
   (Chromium, 1280×800). See `docs/TESTING.md`.
 - Rejected: Vite+TypeScript, Svelte (build step not worth it at this size), game engines (too heavy for grid puzzles).
