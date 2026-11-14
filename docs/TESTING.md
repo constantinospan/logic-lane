@@ -6,7 +6,9 @@ npm ci                                        # once, or after package.json chan
 npx playwright install chromium webkit        # once, downloads the test browsers
 npm run check                                 # type check + unit tests + browser tests
 ```
-`npm run check` is what agents run before pushing, and what CI runs on every PR (plan step 6a).
+`npm run check` is what agents run before pushing, and what CI (`.github/workflows/ci.yml`) runs on every PR and
+on `main` before deploying. CI's `test` job must pass before a PR can merge. When it fails, the run page has a
+`test-report` download with the Playwright report and the pictures of what went wrong.
 
 Individual parts:
 - `npm run typecheck`
@@ -25,6 +27,8 @@ game is at `#/play/demo`.
 | Unit: one game | `tests/unit/games/<id>.test.js` | That game's own rules: every puzzle is solvable and within its level's difficulty |
 | Browser | `tests/e2e/*.spec.js` | Real flows at phone (Chromium), tablet (WebKit, Safari's engine) and desktop sizes |
 | Browser: edge cases | `tests/e2e/edges.spec.js` | Races (reload or leave mid-celebration, double taps), 3 h expiry, old versions, corrupt, blocked or full storage, no speech, unknown addresses, endless top, sideways screens, reduced motion |
+| Visual | `tests/e2e/visual.spec.js` | Pictures of every screen at all three sizes, compared with the saved ones. CI and the builder only (see below) |
+| Deploy prep | `tests/unit/build-site.test.js` | Only shipped files go live, every precached file is there, `VERSION` is stamped with the content hash, docs-only changes keep the same hash |
 | Accessibility | `tests/e2e/a11y.spec.js` | axe (WCAG 2.0–2.2 A/AA) on home, picker (with and without Continue), play (fresh and after a mistake), celebration, update banner and reset |
 | Coverage | `npm test` | **Each** shared-core file (`js/core/`) must stay at 100% of lines and functions (95% of branches); see `coverage/index.html` |
 | AI reviewers | GitHub, plan step 6b (D19) | What tests can't judge: right for a 5-year-old, difficulty feel, code bugs |
@@ -38,12 +42,27 @@ layouts too wide, etc.) and making sure the matching test goes red. Several brea
 reviews found tests that couldn't fail. Those tests were strengthened until they did. Do the same for every new
 test: break the thing, see red, restore.
 
+## Visual snapshots
+`tests/e2e/visual.spec.js` compares each screen with a saved picture in `tests/e2e/visual.spec.js-snapshots/`.
+Fonts and emoji look slightly different on every operating system, so the saved pictures come from one machine:
+GitHub's `ubuntu-24.04` with the browsers Playwright installs. The tests run only when `VISUAL=1` is set, which CI
+and the `@claude` builder do. On a Mac or in claude.ai/code they skip.
+
+- In CI a missing picture is a failure (never written quietly), and a test that only passes on retry fails the run.
+- **Updating pictures, only for an intended visual change:**
+  - The `@claude` builder can run `npx playwright test tests/e2e/visual.spec.js --update-snapshots` itself.
+  - Or: Actions → CI → Run workflow, pick the branch, tick `update_snapshots`. Download the `snapshots` artifact,
+    look at every picture, and commit the ones that changed.
+- The PR lists which pictures changed and why. Never update them just to turn a red check green.
+- Screens are made the same every time: a fixed puzzle (seed `visual`), a fixed cheer, a paused clock for the
+  celebration, no animations.
+
 ## Adding a game
 1. Write `tests/unit/games/<id>.test.js`. For many seeds at every level, check that each puzzle is solvable (with
    a solver) and within that level's rules. `tests/unit/games/demo.test.js` is a small example.
 2. The shared game tests pick up the new game automatically once it's in `GAMES` (`js/core/games.js`).
 3. Add a browser test for the game's interactions (e.g. drag, multi-step moves, hints). Add its screens to
-   `tests/e2e/a11y.spec.js`.
+   `tests/e2e/a11y.spec.js` and `tests/e2e/visual.spec.js`.
 
 ## Notes
 - `tests/shipped-files.js` is the one definition of what the site ships. The PRECACHE test, the deploy version

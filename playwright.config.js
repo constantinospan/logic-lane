@@ -7,6 +7,13 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: Boolean(process.env.CI), // a test that only passes on retry still fails the run
+  // In CI a missing picture is a failure, never quietly written (it would then pass on retry). Pictures are made on
+  // purpose with --update-snapshots (docs/TESTING.md).
+  updateSnapshots: process.env.CI ? 'none' : 'missing',
+  expect: {
+    toHaveScreenshot: { animations: 'disabled', caret: 'hide', maxDiffPixels: 100 },
+  },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${PORT}/logic-lane/`, // trailing slash: tests use goto('./')

@@ -86,6 +86,13 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
   and 95% of branches. `npm test` fails below that. `npm run check` runs everything; CI runs it before deploy on Node 24.
 - Browser tests: phone (Chromium, 390×844, touch), tablet (**WebKit**, Safari's engine, 820×1180, touch), desktop
   (Chromium, 1280×800). See `docs/TESTING.md`.
+- Visual snapshots (Playwright `toHaveScreenshot`) of every screen at all three sizes. Pictures depend on the
+  machine's fonts, so they run only with `VISUAL=1`, on one pinned machine (`ubuntu-24.04`, same setup in CI and the
+  builder). Missing pictures fail in CI (never written quietly), and a test that only passes on retry fails the run.
+  Pictures change only for an intended visual change.
+- CI (`.github/workflows/ci.yml`): Node 24, `npm ci`, Playwright browsers, `npm run check`. Its `test` job is the
+  required check on `main`, enforced for admins too. If CI itself breaks, the owner can briefly allow bypassing
+  (README).
 - Rejected: Vite+TypeScript, Svelte (build step not worth it at this size), game engines (too heavy for grid puzzles).
 
 ### D9. Installable app (PWA)
@@ -127,7 +134,14 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Above the top level: endless fresh puzzles at max difficulty.
 
 ### D15. AI implementation details (from review against claude-code-action docs)
-- Builder = Claude GitHub Action, triggered by `@claude` from users with write access only (bots blocked by default).
+- Builder = Claude GitHub Action (`.github/workflows/claude.yml`), triggered by `@claude` from users with write
+  access only (bots blocked by default). Our workflow adds a stricter guard: only `constantinospan`, and only on
+  issues and PRs `constantinospan` opened, so Claude never reads a stranger's issue text. One run per issue or PR
+  at a time. Pinned to an action release at least 2 weeks old (full commit SHA), like every other action.
+- Builder settings: `include_comments_by_actor: constantinospan`; full history (for revert); same machine and
+  browsers as CI (`VISUAL=1`); `actions: read` so it can read failed CI logs; pre-approved commands for the checks,
+  `npx playwright test` and `git revert`. Pre-approved commands are a convenience, not a sandbox: the action's own
+  safety review handles anything else. Owner-only triggering is the real boundary.
 - Install via the Claude GitHub App (`/install-github-app`). Its pushes trigger other workflows; the default
   GITHUB_TOKEN would NOT, so never rely on GITHUB_TOKEN for pushes that must trigger review/deploy.
 - The action pushes a branch and posts a "Create PR" link (one tap); it does not open PRs itself by default.
@@ -148,7 +162,9 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Only the owner can trigger the builder (write access required; no collaborators; bots blocked).
 - Fork PRs: review workflow runs only when PR author is the owner; repo setting requires approval for all
   outside contributors' workflow runs. Never use `pull_request_target`. Forks don't get repo secrets.
-- PWA cache version = a hash of the shipped files, written into `sw.js` `VERSION` by the deploy job (6a). It's
+- PWA cache version = a hash of the shipped files, written into `sw.js` `VERSION` by the deploy job
+  (`tools/build-site.mjs`: copies only the shipped files to the Pages artifact, stamps the hash, nothing else; a
+  live check after deploy confirms the new `sw.js` is served). It's
   `dev` in the repo. Never edit it by hand. A docs-only change keeps the same hash (no update prompt), and a
   revert gets a new one.
 - Every shipped file is listed in `PRECACHE` in `sw.js`, which a test checks.

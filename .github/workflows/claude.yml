@@ -1,0 +1,72 @@
+# The builder: "@claude <request>" on the owner's own issue or PR starts Claude, which works on a branch, runs the
+# checks and posts a "Create PR" link (D3, D15). Rules for the run: CLAUDE.md.
+#
+# Who can start it (public repo): only constantinospan, only on issues and PRs constantinospan opened, so Claude never
+# reads a stranger's issue text. Claude reads only the owner's comments (include_comments_by_actor).
+# Keep show_full_output off (logs are public) and never re-run this workflow with debug logging, which turns it on.
+name: Claude builder
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+# One run per issue or PR at a time, so two requests never push to the same branch at once.
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: >-
+      github.actor == 'constantinospan' && (
+        (github.event_name == 'issue_comment'
+          && github.event.issue.user.login == 'constantinospan'
+          && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment'
+          && github.event.pull_request.user.login == 'constantinospan'
+          && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review'
+          && github.event.pull_request.user.login == 'constantinospan'
+          && contains(github.event.review.body, '@claude')) ||
+        (github.event_name == 'issues'
+          && github.event.issue.user.login == 'constantinospan'
+          && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      )
+    # Same machine and browser install as ci.yml, so visual snapshots Claude makes match CI's.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      VISUAL: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history, so "revert PR #N" can find the commit
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      # Installed from main's lockfile. If the PR changed package-lock.json, Claude runs npm ci again (CLAUDE.md).
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          include_comments_by_actor: constantinospan
+          additional_permissions: |
+            actions: read
+          # Pre-approved commands (not a sandbox: other commands go through the action's own safety review).
+          claude_args: >-
+            --allowedTools "Bash(npm ci),Bash(npm run check),Bash(npm test:*),Bash(npm run typecheck),Bash(npm run test:e2e:*),Bash(npx playwright test:*),Bash(git revert:*),Bash(git log:*),Bash(git status),Bash(git diff:*)"

@@ -42,7 +42,8 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 
 ## Tech rules (D8, D9, D16)
 - Plain JavaScript ES modules, HTML and CSS. Shipped files are the repo files (the one exception: deploy writes
-  `VERSION` in `sw.js`). No compile step. How games plug in: `docs/GAME-API.md`.
+  `VERSION` in `sw.js`). No compile step. `tools/build-site.mjs` only copies the shipped files and stamps `VERSION`
+  for deploy; keep it that way. How games plug in: `docs/GAME-API.md`.
 - Types are JSDoc comments, checked by TypeScript in CI (`checkJs`). Add JSDoc types to new functions.
 - **Relative paths only.** The site is served from `/logic-lane/`, not the domain root.
 - Rendering: HTML/SVG + CSS animations. Input: pointer events only, so touch and mouse share one code path.
@@ -84,6 +85,12 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 4. Run all checks before pushing: `npm run check` (type check, unit tests, browser tests; see `docs/TESTING.md`).
    A new game adds `tests/unit/games/<id>.test.js` (see `docs/GAME-API.md`). Don't push failing checks. If you couldn't run a check, say so in the PR. Never
    claim checks passed when you didn't run them.
+   - If `package-lock.json` differs from `main`, run `npm ci` first.
+   - **Visual snapshots** (`tests/e2e/visual.spec.js`) run only with `VISUAL=1`: in CI and the GitHub builder.
+     Elsewhere they skip; say so in the PR. Update the pictures (`npx playwright test tests/e2e/visual.spec.js
+     --update-snapshots`, on the builder only) **only** when the change is meant to look different. Look at each
+     new picture, and list which ones changed and why in the PR. Never update them just to make a failing check
+     pass. A new screen or game adds its own snapshots.
 5. **Hand-off:**
    - The GitHub builder posts the **Create PR** link.
    - Sessions open the PR if they can; otherwise they give the owner the link to create it.

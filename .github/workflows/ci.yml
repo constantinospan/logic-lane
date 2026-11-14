@@ -1,0 +1,126 @@
+# Tests every PR and every change to main; deploys main to GitHub Pages when tests pass (D8, D16).
+# The "test" job is the required check on main: nothing merges red.
+# Security (public repo): read-only token by default, never pull_request_target, no secrets used here.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Make new visual snapshot pictures (download them from the run, check, commit)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    if: ${{ !inputs.update_snapshots }}
+    # Pinned (not ubuntu-latest): visual snapshots depend on the machine's fonts. Keep in step with claude.yml.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      VISUAL: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run check
+      - name: Upload test report and pictures (on failure)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  # Run by hand (Actions → CI → Run workflow → update_snapshots) to make new visual snapshot pictures on the same
+  # machine CI uses. It never commits: download the "snapshots" artifact, look at every picture, then commit.
+  snapshots:
+    if: ${{ inputs.update_snapshots }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      VISUAL: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright test tests/e2e/visual.spec.js --update-snapshots
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: snapshots
+          path: tests/e2e/visual.spec.js-snapshots/
+          retention-days: 14
+
+  deploy:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # Copies only the shipped files and stamps VERSION in sw.js. No npm install needed.
+      - name: Prepare the site
+        id: site
+        run: echo "version=$(node tools/build-site.mjs _site)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      # Pages caches files for up to 10 minutes, so ask past the cache for the new sw.js.
+      - name: Check the live site has the new version
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          VERSION: ${{ steps.site.outputs.version }}
+        run: |
+          for i in $(seq 1 18); do
+            if curl -fsS -H 'Cache-Control: no-cache' "${PAGE_URL}sw.js?cb=${GITHUB_SHA}" | grep -q "const VERSION = '${VERSION}';"; then
+              echo "Live: version ${VERSION}"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::The live sw.js does not have version ${VERSION} after 3 minutes"
+          exit 1
