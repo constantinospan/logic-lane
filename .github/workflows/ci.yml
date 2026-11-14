@@ -23,11 +23,34 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
+  # The same checks as `npm run check`, split across machines that run at the same time: type check and unit tests on
+  # one, browser tests shared out over three ("shards": Playwright gives each a third of all tests, so new tests and
+  # new screen sizes are included automatically).
+  checks:
+    if: ${{ !inputs.update_snapshots }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  browser:
     if: ${{ !inputs.update_snapshots }}
     # Pinned (not ubuntu-latest): visual snapshots depend on the machine's fonts. Keep in step with claude.yml.
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false # finish every shard, so one red run shows all failures
+      matrix:
+        shard: [1, 2, 3]
     env:
       CI: 'true'
       VISUAL: '1'
@@ -40,17 +63,45 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run check
+      # The browsers are kept between runs (keyed by the lockfile, so a Playwright upgrade gets fresh ones). The
+      # system packages and fonts are always installed fresh, so the pictures don't depend on the cache.
+      - name: Restore test browsers
+        id: browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        run: npx playwright install --with-deps chromium webkit
+      - if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
+        run: npx playwright install-deps chromium webkit
+      - run: npx playwright test --shard=${{ matrix.shard }}/3
       - name: Upload test report and pictures (on failure)
         if: ${{ failure() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: test-report
+          name: test-report-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
           retention-days: 14
+
+  # The required check on main. Passes only if every part above passed. It must never be skipped, because GitHub
+  # counts a skipped required check as passed: `always()` keeps it running when a part fails, and on a manual snapshot
+  # run (where the parts don't run) it goes red on purpose, so that run can't make a red PR look mergeable.
+  test:
+    if: ${{ always() }}
+    needs: [checks, browser]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All checks passed?
+        env:
+          CHECKS: ${{ needs.checks.result }}
+          BROWSER: ${{ needs.browser.result }}
+        run: |
+          echo "type check + unit tests: ${CHECKS}; browser tests: ${BROWSER}"
+          test "${CHECKS}" = success && test "${BROWSER}" = success
 
   # Run by hand (Actions → CI → Run workflow → update_snapshots) to make new visual snapshot pictures on the same
   # machine CI uses. It never commits: download the "snapshots" artifact, look at every picture, then commit.

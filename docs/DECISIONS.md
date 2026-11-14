@@ -83,16 +83,18 @@ Usage counts against Max plan limits; no per-use billing. Never use a work/org a
   (`checkJs`; 6.x is the last JS-based compiler), @vitest/coverage-v8 4.1.12 (coverage), @axe-core/playwright
   4.14.0 (accessibility). The owner wants as many tests as possible.
 - Coverage minimum: **every file** in the shared core (`js/core/`) stays at 100% of lines, statements and functions,
-  and 95% of branches. `npm test` fails below that. `npm run check` runs everything; CI runs it before deploy on Node 24.
+  and 95% of branches. `npm test` fails below that. `npm run check` runs everything; CI runs the same checks before deploy on Node 24.
 - Browser tests: phone (Chromium, 390×844, touch), tablet (**WebKit**, Safari's engine, 820×1180, touch), desktop
   (Chromium, 1280×800). See `docs/TESTING.md`.
 - Visual snapshots (Playwright `toHaveScreenshot`) of every screen at all three sizes. Pictures depend on the
   machine's fonts, so they run only with `VISUAL=1`, on one pinned machine (`ubuntu-24.04`, same setup in CI and the
   builder). Missing pictures fail in CI (never written quietly), and a test that only passes on retry fails the run.
   Pictures change only for an intended visual change.
-- CI (`.github/workflows/ci.yml`): Node 24, `npm ci`, Playwright browsers, `npm run check`. Its `test` job is the
-  required check on `main`, enforced for admins too. If CI itself breaks, the owner can briefly allow bypassing
-  (README).
+- CI (`.github/workflows/ci.yml`): Node 24, `npm ci`, Playwright browsers, the same checks as `npm run check`,
+  split for speed: type check + unit tests on one machine, browser tests in 3 shards, all at once. A final `test`
+  job is the required check on `main`, enforced for admins too. It passes only if every part passed, and is never
+  skipped (GitHub counts a skipped required check as passed), so on a manual snapshot run it's red on purpose. If CI
+  itself breaks, the owner can briefly allow bypassing (README).
 - Rejected: Vite+TypeScript, Svelte (build step not worth it at this size), game engines (too heavy for grid puzzles).
 
 ### D9. Installable app (PWA)
