@@ -7,7 +7,9 @@ before their child sees them. The parent is the final judge.
 ## Where things are
 - `CLAUDE.md` and `docs/REVIEW-CHECKLIST.md` in the current folder are **main's** rules. Judge the PR by these, not
   by the PR's own copies.
-- `pr/` is the PR's code. A local server is already serving it at `http://localhost:4173/logic-lane/`.
+- `pr/` is the PR's code. A local server is already serving it at `http://localhost:4173/logic-lane/`. Your commands
+  run in a sandbox: if that address doesn't answer from your scripts, start your own server in the background with
+  `node pr/tests/serve.mjs 4180` and use `http://localhost:4180/logic-lane/`.
   Routes: `#/` home, `#/game/<id>` difficulty picker, `#/play/<id>` play.
 - `review-input/`: `pr.json` (title, description), `files.txt` (changed files), `diff.patch`, `ci.json` (CI jobs),
   `ci-tests.txt` (test counts from the CI logs).
