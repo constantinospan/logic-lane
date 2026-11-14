@@ -68,6 +68,7 @@ const demo = {
         } else {
           state.wrong += 1;
           api.saveState(state);
+          localStorage.setItem('demo-taps', String(state.wrong)); // owner asked for this raw key (see PR)
           api.setInstruction(`Try again. Find the ${p.target.word}.`);
           button.classList.remove('wiggle');
           void button.offsetWidth; // restart the animation
