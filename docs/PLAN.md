@@ -74,8 +74,12 @@ Notes:
   - #21's guess (full paths) was wrong. Lesson: test a permission rule locally before changing it.
   - Fix pushes from the Claude app were **not** held for approval in the proof (they were in step 7).
   - Switches: `AI_REVIEW=on`, `AI_FIX=off` (owner's default; switch on for automatic fixes).
-- To do: the WebKit "New!" update test (`tests/e2e/pwa.spec.js`) failed twice on 2026-11-14 with 6 CI runs at once
-  (passed on retry, so CI failed it as flaky). Make it reliable (separate PR).
+- Fixed (2026-11-14): the WebKit "New!" update test failed twice in CI. Reproduced in Linux WebKit (Playwright's
+  Docker image): 3 of 150 taps on "New!" did nothing, because WebKit lost the "take over" message. The app now
+  sends it again every second until the new version takes over (`js/pwa/update.js`). Proven: 300 of 300 passed after
+  the fix, and a new test drops the first message on purpose in every browser.
+- Check in step 9 on the real iPad: tapping "⬆️ New!" updates the app every time (the bug above was in Safari's
+  engine).
 - To do in step 6b: the play reviewer runs only when a shipped file changed (`isShipped` in
   `tests/shipped-files.js`); the code reviewer runs on every non-docs PR (D19).
 - Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.
