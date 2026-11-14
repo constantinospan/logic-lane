@@ -29,8 +29,10 @@ code reviewer has those). Mark items that don't apply to this PR as N/A. Review 
   `speechSynthesis.speak` call, since headless browsers have no voices).
 - Measure tap targets with `getBoundingClientRect()`: at least 64×64 CSS px with 8 px between them.
 - Look at the screenshots in `review-shots/` with the Read tool. Save any extra screenshot that shows a finding as
-  `review-shots/extra-<short-name>.png` and list it in `screenshots`.
-- To re-take the standard set (e.g. after a timing problem): `node tools/review/shots.mjs http://localhost:4173/logic-lane/ review-shots <game-id>`.
+  `review-shots/extra-<short-name>.png` (only files named `extra-*.png` are kept) and list it in `screenshots`.
+- To re-take the standard set (e.g. after a timing problem):
+  `node tools/review/shots.mjs http://localhost:4173/logic-lane/ review-tmp/shots <game-id>`. The original set and
+  report were saved before you started and are what the verdict uses.
 
 ## Rules for you
 - **Read-only.** Never edit files in `pr/` or the rules. You only write in `review-tmp/` and `review-shots/`.

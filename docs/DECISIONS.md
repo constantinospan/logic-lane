@@ -169,6 +169,10 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
     runs (`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`). What they read is collected for them first (`review-input/`).
   - Only the verdict job writes (comment, labels, the `ai-review` commit status, the screenshots branch). It has no
     AI and never runs the PR's code.
+  - Known leftover risk, accepted because only the owner's own PRs are reviewed: the play reviewer can run Node
+    scripts it writes, with network access, in a job where the Claude token exists in the parent process. Text in a
+    PR that steered it could in theory leak that token. If PRs from anyone else are ever reviewed, sandbox those
+    scripts first.
   - Switches (repo variables): `AI_REVIEW=on` runs reviews, `AI_FIX=on` runs fix rounds. Anything else is off.
   - Proof exception (owner, 2026-11-14): a `workflow_run` workflow only runs once it's on `main`, so it can't be
     proven on GitHub before merge, as "Changing CI" in `CLAUDE.md` asks. It merges switched off, then is proven with
@@ -229,7 +233,7 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Until 6b exists, a fresh agent reviews each PR by hand before it's handed to the owner.
 - Fixed checks don't depend on the AI: `tools/review/shots.mjs` takes the standard screenshots (home, and each
   affected game's picker and first Easy puzzle, at all three sizes) and logs console errors and requests to other
-  sites. Those two are Blocking automatically. The play reviewer drives the browser with the repo's existing
+  sites. Those two are Blocking automatically. They're saved before the AI starts, so it can't change them. The play reviewer drives the browser with the repo's existing
   Playwright (no new package).
 - The verdict is built by a plain script (`tools/review/verdict.mjs`) from both reviewers' structured answers. It
   also sets the `ai-review` commit status on the PR (not a required check).

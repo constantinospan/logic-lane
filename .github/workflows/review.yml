@@ -96,7 +96,9 @@ jobs:
       - name: Which reviewers are needed
         if: ${{ steps.pr.outputs.found == 'true' }}
         id: scope
-        run: node tools/review/scope.mjs pr | tee -a "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail # a crash in the script must fail the step, not pass through tee
+          node tools/review/scope.mjs pr | tee -a "$GITHUB_OUTPUT"
 
   play-review:
     needs: gate
@@ -159,6 +161,13 @@ jobs:
         run: |
           read -ra games <<<"$GAMES"
           node tools/review/shots.mjs http://localhost:4173/logic-lane/ review-shots "${games[@]}"
+      # Saved before the AI starts, so it can't change or drop what the fixed checks found (D19).
+      - name: Keep the standard screenshots and report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-shots-fixed
+          path: review-shots/
+          retention-days: 14
       - name: Result format
         id: schema
         run: echo "json=$(jq -c . tools/review/schema.json)" >> "$GITHUB_OUTPUT"
@@ -176,12 +185,12 @@ jobs:
             --json-schema '${{ steps.schema.outputs.json }}'
             --allowedTools "Read,Glob,Grep,Write,Bash(node review-tmp/:*),Bash(node tools/review/shots.mjs:*),Bash(git -C pr diff:*),Bash(git -C pr log:*),Bash(git -C pr show:*),Bash(ls:*)"
             --disallowedTools "Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
-      - name: Keep the screenshots for the verdict
+      - name: Keep the reviewer's extra screenshots
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: review-shots
-          path: review-shots/
+          name: review-shots-extra
+          path: review-shots/extra-*.png
           if-no-files-found: ignore
           retention-days: 14
 
@@ -275,11 +284,18 @@ jobs:
           head=$(gh api "repos/${REPO}/pulls/${PR}" --jq .head.sha)
           if [ "$head" = "$HEAD_SHA" ]; then echo "current=true" >> "$GITHUB_OUTPUT"
           else echo "::notice::The PR moved on to ${head}; that commit gets its own review."; fi
+      # Extras first, then the fixed set on top, so the fixed report and pictures always win.
+      - if: ${{ steps.current.outputs.current == 'true' && needs.gate.outputs.play == 'true' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # the reviewer may have saved none
+        with:
+          name: review-shots-extra
+          path: review-shots
       - if: ${{ steps.current.outputs.current == 'true' && needs.gate.outputs.play == 'true' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         continue-on-error: true # no pictures is reported in the comment, not a crash
         with:
-          name: review-shots
+          name: review-shots-fixed
           path: review-shots
       - name: Publish the screenshots
         if: ${{ steps.current.outputs.current == 'true' && needs.gate.outputs.play == 'true' }}
@@ -333,7 +349,9 @@ jobs:
           SHOTS_BASE: ${{ steps.shots.outputs.base }}
           FIX_ROUNDS: ${{ needs.gate.outputs.rounds }}
           AI_FIX: ${{ vars.AI_FIX }}
-        run: node tools/review/verdict.mjs "${RUNNER_TEMP}/verdict" | tee -a "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          node tools/review/verdict.mjs "${RUNNER_TEMP}/verdict" | tee -a "$GITHUB_OUTPUT"
       - name: Post the verdict
         if: ${{ steps.verdict.outputs.state && steps.verdict.outputs.state != 'none' }}
         env:
@@ -353,6 +371,16 @@ jobs:
           if [ "$STATE" = incomplete ] || { [ "$STATE" = fail ] && [ "$AI_FIX" = on ] && [ "$FIX" != true ]; }; then
             gh pr edit "$PR" --repo "$REPO" --add-label needs-you
           fi
+      - name: Say so if the verdict couldn't be built
+        if: ${{ failure() && steps.current.outputs.current == 'true' && steps.verdict.outcome != 'success' }}
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create needs-you --repo "$REPO" --color d93f0b --description 'Waiting for the owner' 2>/dev/null || true
+          gh pr comment "$PR" --repo "$REPO" --body "⚠️ The AI review couldn't build its verdict, so there's no result for \`${HEAD_SHA:0:7}\`. Log: ${RUN_URL}"
+          gh api "repos/${REPO}/statuses/${HEAD_SHA}" -f state=error -f context=ai-review \
+            -f description="Verdict failed" -f target_url="$RUN_URL" > /dev/null
+          gh pr edit "$PR" --repo "$REPO" --add-label needs-you
       - name: Keep the Blocking list for the fix run
         if: ${{ steps.verdict.outputs.fix == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -365,7 +393,7 @@ jobs:
   # owner taps "Approve and run workflows"), and a green CI run starts this workflow again: that's round 2.
   fix:
     needs: [gate, verdict]
-    if: ${{ !cancelled() && needs.verdict.outputs.fix == 'true' && vars.AI_FIX == 'on' }}
+    if: ${{ !cancelled() && needs.verdict.result == 'success' && needs.verdict.outputs.fix == 'true' && vars.AI_FIX == 'on' }}
     runs-on: ubuntu-24.04 # same machine and browsers as CI and the builder, so new pictures match
     timeout-minutes: 60
     concurrency: # never cancelled halfway through its push
@@ -377,8 +405,7 @@ jobs:
       issues: write
       id-token: write # for the Claude app token, whose push starts CI (the job token's wouldn't)
       actions: read
-    env:
-      GH_TOKEN: ${{ github.token }}
+    env: # no GitHub token here: the PR's own install scripts and tests run in this job
       REPO: ${{ github.repository }}
       PR: ${{ needs.gate.outputs.number }}
       HEAD_SHA: ${{ needs.gate.outputs.sha }}
@@ -386,9 +413,19 @@ jobs:
       VISUAL: '1'
       CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
     steps:
+      # Before a round is used up: if the branch moved, the new commit gets its own review instead.
+      - name: Still the reviewed commit?
+        id: head
+        run: |
+          now=$(git ls-remote "https://github.com/${REPO}.git" "refs/heads/${BRANCH}" | cut -f1)
+          if [ "$now" != "$HEAD_SHA" ]; then
+            echo "::error::The branch moved on since the review. The new commit gets its own review."
+            exit 1
+          fi
       # Counted before Claude starts, so the 2-round limit never depends on what Claude writes.
       - name: Count this fix round
         env:
+          GH_TOKEN: ${{ github.token }}
           ROUNDS: ${{ needs.gate.outputs.rounds }}
         run: |
           label="ai-fix-$((ROUNDS + 1))"
@@ -399,12 +436,8 @@ jobs:
           ref: ${{ needs.gate.outputs.branch }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Still the reviewed commit?
-        run: |
-          if [ "$(git rev-parse HEAD)" != "$HEAD_SHA" ]; then
-            echo "::error::The branch moved on since the review. The new commit gets its own review."
-            exit 1
-          fi
+      - name: Checked out the reviewed commit?
+        run: test "$(git rev-parse HEAD)" = "$HEAD_SHA"
       # Like the action does on PR runs (it doesn't on workflow_run): agent files come from main, the PR's copies go
       # to .claude-pr/ for reference, nothing is staged. Keeps CLAUDE.md's "rule files on PR runs" section true.
       - name: Agent rules from main
@@ -447,12 +480,21 @@ jobs:
             --allowedTools "Read,Glob,Grep,Write,Edit,MultiEdit,Bash(npm ci),Bash(npm run check),Bash(npm test:*),Bash(npm run typecheck),Bash(npm run test:e2e:*),Bash(npx playwright test:*),Bash(npx vitest:*),Bash(git log:*),Bash(git show:*),Bash(git status),Bash(git diff:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD:${{ needs.gate.outputs.branch }})"
             --disallowedTools "WebFetch,WebSearch"
       - name: Report
-        if: ${{ always() }}
+        if: ${{ always() && steps.head.outcome == 'success' }}
         env:
+          GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -uo pipefail
-          now=$(git ls-remote origin "refs/heads/${BRANCH}" | cut -f1)
+          # Not via origin: the action has revoked the app token it put there by now.
+          now=$(git ls-remote "https://github.com/${REPO}.git" "refs/heads/${BRANCH}" | cut -f1)
+          # A push counts only if it builds on the reviewed commit (not someone else's push meanwhile).
+          if [ -n "$now" ] && [ "$now" != "$HEAD_SHA" ] &&
+            [ "$(gh api "repos/${REPO}/compare/${HEAD_SHA}...${now}" --jq .status 2>/dev/null)" = ahead ]; then
+            pushed=true
+          else
+            pushed=false
+          fi
           body="${RUNNER_TEMP}/fix-comment.md"
           {
             echo '## 🔧 Automatic fix round'
@@ -465,7 +507,7 @@ jobs:
             fi
             echo
             echo '---'
-            if [ -n "$now" ] && [ "$now" != "$HEAD_SHA" ]; then
+            if [ "$pushed" = true ]; then
               echo "Pushed \`${now:0:7}\`. GitHub holds its tests until you approve them: open this PR in a browser" \
                 "and tap **Approve and run workflows**. The tests then run, and the review runs again after them."
             else
@@ -474,4 +516,4 @@ jobs:
           } > "$body"
           gh label create needs-you --repo "$REPO" --color d93f0b --description 'Waiting for the owner' 2>/dev/null || true
           gh pr comment "$PR" --repo "$REPO" --body-file "$body"
-          if [ -z "$now" ] || [ "$now" = "$HEAD_SHA" ]; then gh pr edit "$PR" --repo "$REPO" --add-label needs-you; fi
+          if [ "$pushed" != true ]; then gh pr edit "$PR" --repo "$REPO" --add-label needs-you; fi
