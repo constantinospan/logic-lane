@@ -73,3 +73,5 @@ and the `@claude` builder do. On a Mac or in claude.ai/code they skip.
   the cookie `test-sw-version=<v>` gets `sw.js` with that `VERSION`, as if a new version had been deployed.
   Playwright can't intercept service worker scripts, so this is how the update test works.
 - The real-iPad check (speech, press-and-hold, installing) happens by hand in plan step 9.
+
+<!-- proof 6b: docs-only change, should get no AI review -->
