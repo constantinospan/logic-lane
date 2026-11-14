@@ -8,6 +8,10 @@ import { expect, hold, readSave, startDemo, tapRightChoice, tapWrongChoice, test
 
 test.skip(!process.env.VISUAL, 'Visual snapshots run only with VISUAL=1 (CI and the @claude builder). See docs/TESTING.md.');
 
+// No service worker, except in the update-banner test: in WebKit on Linux a stray "⬆️ New!" banner once showed up
+// in an unrelated picture. The service worker has its own tests (pwa.spec.js, edges.spec.js).
+test.use({ serviceWorkers: 'block' });
+
 test.beforeEach(async ({ context }) => {
   // Same cheer every time: the celebration picks it with Math.random.
   await context.addInitScript(() => {
@@ -83,16 +87,20 @@ test('celebration', async ({ page }) => {
   await expect(page.locator('.celebrate')).toBeVisible();
 });
 
-test('update banner', async ({ page, context, baseURL }) => {
-  await page.goto('./');
-  await page.waitForFunction(async () => {
-    await navigator.serviceWorker.ready;
-    return navigator.serviceWorker.controller !== null;
+test.describe('with the service worker', () => {
+  test.use({ serviceWorkers: 'allow' });
+
+  test('update banner', async ({ page, context, baseURL }) => {
+    await page.goto('./');
+    await page.waitForFunction(async () => {
+      await navigator.serviceWorker.ready;
+      return navigator.serviceWorker.controller !== null;
+    });
+    await context.addCookies([{ name: 'test-sw-version', value: 'visual-next', url: String(baseURL) }]);
+    await page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.update());
+    await expect(page.locator('.update-banner')).toBeVisible({ timeout: 10_000 });
+    await snap(page, 'update-banner');
   });
-  await context.addCookies([{ name: 'test-sw-version', value: 'visual-next', url: String(baseURL) }]);
-  await page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.update());
-  await expect(page.locator('.update-banner')).toBeVisible({ timeout: 10_000 });
-  await snap(page, 'update-banner');
 });
 
 test('reset screen', async ({ page }) => {
