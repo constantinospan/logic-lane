@@ -19,6 +19,12 @@ test('difficulty picks the starting level', async ({ page }) => {
   await expect(page.locator('.level-label')).toHaveText('Level 11');
 });
 
+test('a wrong tap writes the wrong-tap count to the raw demo-taps key', async ({ page }) => {
+  await startDemo(page);
+  await tapWrongChoice(page);
+  expect(await page.evaluate(() => localStorage.getItem('demo-taps'))).toBe('1');
+});
+
 test('reopening the app goes back into the same puzzle, with the same progress', async ({ page }) => {
   await startDemo(page);
   const layout = await demoLayout(page);
