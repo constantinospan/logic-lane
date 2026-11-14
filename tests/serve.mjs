@@ -34,7 +34,7 @@ const TYPES = {
 };
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+  const url = new URL(req.url ?? '/', 'http://localhost'); // fixed base: a bad Host header can't crash us
   if (url.pathname === '/logic-lane') {
     res.writeHead(301, { Location: BASE });
     res.end();
