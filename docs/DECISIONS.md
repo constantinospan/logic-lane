@@ -167,6 +167,8 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
     claude`, so re-reviews after a fix push work).
   - Reviewer jobs use the read-only job token and can't write to GitHub. Secrets are hidden from the commands Claude
     runs (`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`). What they read is collected for them first (`review-input/`).
+    The scrub needs bubblewrap (Ubuntu's own package), which the workflow installs before each Claude step; without
+    it Claude Code refuses to start (found in the first proof run, 2026-11-14).
   - Only the verdict job writes (comment, labels, the `ai-review` commit status, the screenshots branch). It has no
     AI and never runs the PR's code.
   - Known leftover risk, accepted because only the owner's own PRs are reviewed: the play reviewer can run Node
