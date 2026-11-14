@@ -11,7 +11,7 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 4 ✅ | Shared base | Home screen, difficulty picker, refresh protection (localStorage, 3 h resume window), seeded random, installable app, styles | Claude | — | 2–3 h |
 | 5 ✅ | Tests | Unit tests, browser tests at phone, tablet + desktop sizes, type checking | Claude | — | 1 h |
 | 6a ✅ | Core pipeline | Tests gate + deploy, builder (`@claude`), fork guards. A working request → PR → merge → live loop | Claude | — | 1–1.5 h |
-| 7 | Dry run | You open a small test issue from your phone, watch it go to PR → merge → live | Both | 30 min | 30 min |
+| 7 ✅ | Dry run | You open a small test issue from your phone, watch it go to PR → merge → live | Both | 30 min | 30 min |
 | 6b | AI reviewers | Play reviewer (browser, screenshots) and code reviewer (diff), one verdict, auto-fix loop (max 2) (D19). Added on top of the working loop; expect a few iterations | Claude | 10 min | 1.5–2 h |
 | 8 | Arrow path v1 | Puzzle generator + solver, ~30-level ladder, Easy/Medium/Hard starts, loops later in the ladder | Claude | — | 3–5 h |
 | 9 | Playtest | Install on the tablet, play with her, turn feedback into issues | Me | 20 min + play | — |
@@ -45,9 +45,22 @@ Notes:
   content-hash `VERSION` from `tools/build-site.mjs` and a live check) and `.github/workflows/claude.yml` (the
   builder, owner-only on the owner's own issues and PRs). Visual snapshots of every screen, Linux pictures, run in CI
   and the builder only. After merge: `test` is a required check on `main`, enforced for admins.
-- To check in step 7: `@claude` from an issue works end to end (branch, checks, Create PR link); its push triggers
-  CI; `@claude revert PR #N`; the `Bash(... :*)` pre-approved commands work; a failed run notifies the owner;
-  `@claude` on someone else's issue does nothing.
+- Step 7 done (2026-11-14). Issue #8 (from the phone) → builder (4 min) → PR #9 → `@claude` change on the PR → merge
+  → live. Then issue #10 `@claude revert PR #9` → PR #11 → merge → live again with the earlier version. Confirmed:
+  - The builder runs the checks, including visual snapshots; its new pictures matched CI's exactly.
+  - The PR author is the owner (they tap Create PR), so CI runs on PR creation straight away.
+  - `@claude` on an open PR pushes to the same branch. Its push **does** start CI, but GitHub holds that run for
+    approval ("require approval for all outside contributors" treats the bot as an outsider). Decided (owner): keep
+    the setting and tap **Approve and run workflows** each time, for now. Revisit in 6b, because the auto-fix loop
+    depends on it (options: keep approving, loosen to first-time contributors, or push with an owner token).
+  - Revert used `git revert` on the squash commit; the result matched the pre-#9 code exactly.
+  - Allow-listed commands with `:*` (e.g. `git revert`, `npm test`) worked.
+  - The builder once misreported its own checks (said visual tests skipped while all 150 ran). 6b's code reviewer
+    should check claims in the PR text against CI.
+  - On the phone, GitHub's mobile compare page hid the **Create pull request** button (owner will retry; workaround
+    in README).
+  - Not tested: `@claude` on someone else's issue (needs a second account; the workflow's `if:` blocks it and was
+    reviewed). Failure notifications for builder runs (none failed).
 - To do in step 6b: the play reviewer runs only when a shipped file changed (`isShipped` in
   `tests/shipped-files.js`); the code reviewer runs on every non-docs PR (D19).
 - Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.
@@ -63,9 +76,9 @@ Notes:
   section 6 has the shared history it needs.
 - To do in step 6b: the fix run must push with the Claude App token, not the default workflow token, or its push
   won't re-trigger tests and review.
-- To check in step 7: can a claude.ai/code session push a change under `.github/workflows/`? Until then,
+- To check the first time a claude.ai/code session is used (not covered by step 7): can it push a change under `.github/workflows/`? Until then,
   pipeline changes are local-only.
-- To check in step 7: when a claude.ai/code session opens a PR, is the PR author the owner or the Claude app?
+- To check the first time a claude.ai/code session is used: when it opens a PR, is the PR author the owner or the Claude app?
   The reviewer's "owner-only" guard (D16) must allow whichever it is. If the author is the Claude app (a bot),
   the action treats the PR as coming from a non-write author and blocks npm and test runners on it, so `@claude`
   and fix runs couldn't run checks there. In that case, sessions should push the branch and let the owner open the PR.

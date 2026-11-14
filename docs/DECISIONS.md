@@ -165,8 +165,9 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - PWA cache version = a hash of the shipped files, written into `sw.js` `VERSION` by the deploy job
   (`tools/build-site.mjs`: copies only the shipped files to the Pages artifact, stamps the hash, nothing else; a
   live check after deploy confirms the new `sw.js` is served). It's
-  `dev` in the repo. Never edit it by hand. A docs-only change keeps the same hash (no update prompt), and a
-  revert gets a new one.
+  `dev` in the repo. Never edit it by hand. A docs-only change keeps the same hash (no update prompt). A revert
+  goes back to the earlier hash (the files are identical again). That still differs from what's installed, so
+  devices that had the reverted version see the update banner.
 - Every shipped file is listed in `PRECACHE` in `sw.js`, which a test checks.
 - All this account's `*.github.io` sites share one origin, so every storage key and cache name is prefixed
   `logic-lane:`. Nothing clears storage or caches it didn't create.
