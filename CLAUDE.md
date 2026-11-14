@@ -114,13 +114,17 @@ own block so it stands out from the rest of the text (owner, 2026-11-14):
 ```
 ---
 ### Result · PR #28
-**Tests:** passed
-**AI review:** pass, 2 suggestions
+🟩 **Tests:** passed
+🟨 **AI review:** still running
 ---
 ```
 
-- One bold label per line, with the result in plain words: passed, failed, still running, merged.
-- No emoji, no ticks or crosses, no raw codes like `SUCCESS`.
+- One line per result: a coloured square, a bold label, then the result in plain words.
+  - 🟩 green: passed, merged, done.
+  - 🟥 red: failed.
+  - 🟨 yellow: pending, still running, waiting for the owner.
+- Markdown can't colour text, so the squares carry the colour. Use no other emoji, no ticks or crosses, and no raw
+  codes like `SUCCESS`.
 - Several results at once: one block each.
 - This is for how agents report. The AI review's own verdict comment keeps its ✅/❌ format (`docs/REVIEW-CHECKLIST.md`).
 
