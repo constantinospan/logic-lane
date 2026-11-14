@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { loadSettings } from './score.mjs';
+import { loadSettings } from './decide.mjs';
 
 /**
  * Requests that skip the check. The WHOLE request (after "@claude", ignoring case, spaces and closing punctuation)
@@ -64,7 +64,7 @@ export function requestText(eventName, event) {
 /**
  * @param {string} eventName
  * @param {any} event
- * @param {import('./score.mjs').Settings} settings
+ * @param {import('./decide.mjs').Settings} settings
  * @returns {{route: 'review' | 'skip', reason: string, number: number, kind: 'issue' | 'pr'}}
  */
 export function decide(eventName, event, settings) {

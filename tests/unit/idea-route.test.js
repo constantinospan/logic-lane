@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { decide, normalise, requestText, skipReason } from '../../tools/idea/route.mjs';
 
-const ON = { enabled: true, passMark: 75, weights: { major: 15, question: 10, minor: 5 } };
+const ON = { enabled: true, maxAssumptions: 3 };
 const OFF = { ...ON, enabled: false };
 
 describe('skipReason', () => {

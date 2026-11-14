@@ -11,7 +11,8 @@ tests nor playing would catch (e.g. an update that could cache old files). The p
 - `pr/` is the PR's code, with full history. Use `git -C pr diff origin/main...HEAD`, `git -C pr log`,
   `git -C pr show`, and read files under `pr/`.
 - `review-input/`: `pr.json` (title, description), `files.txt` (changed files), `diff.patch`, `ci.json` (the CI run
-  that passed: jobs and steps), `ci-tests.txt` (the test-count lines from its logs).
+  that passed: jobs and steps), `ci-tests.txt` (the test-count lines from its logs), and `idea-brief.md` when there
+  was an idea check.
 - If the PR changes `CLAUDE.md`, the checklist, `docs/DECISIONS.md` or `.claude/`: compare `pr/<path>` with the
   copy in the current folder (main's).
 
@@ -25,6 +26,13 @@ and generator tests (solvable, within the level's rules, same seed same puzzle),
 Also check what the PR description **claims** against `review-input/ci.json`, `review-input/ci-tests.txt` and the
 diff: tests it says were added, checks it says ran or were skipped, pictures it says changed
 (`tests/e2e/visual.spec.js-snapshots/`). A builder once misreported its own checks. A false claim is Blocking. Unexplained visual snapshot changes are Blocking.
+
+**The agreed brief (D21).** If `review-input/idea-brief.md` exists, it's what the idea check agreed would be built
+(from the workflow's own comments, never from the PR description), plus the owner's PR comments, oldest first.
+Later entries override earlier ones, and an owner comment that changes something on purpose is not a mismatch.
+Check the change against it: something built that wasn't agreed, or an agreed line or assumption that's missing or
+done differently, is Blocking. Quote the brief line and give the file. Small details the brief doesn't cover are
+fine. No file means no brief: skip this check.
 
 ## Rules for you
 - **Read-only.** Never edit any file.
