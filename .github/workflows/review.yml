@@ -1,0 +1,519 @@
+# The AI reviewers (D19) and the automatic fix loop (D17). After CI passes on one of the owner's PRs: a play
+# reviewer (real browser, screenshots) and a code reviewer (reads the changes) each return findings, a plain script
+# turns them into ONE ✅/❌ comment, and on ❌ a fix run works through the Blocking items (at most 2 rounds).
+#
+# Why workflow_run: it starts only after CI passed, and GitHub always runs main's copy of this file, so a PR can't
+# change the review that judges it. For the same reason every script and prompt used here comes from main
+# (checked out at the workspace root); the PR's code sits in pr/ and is only read, served and played.
+#
+# Switches (Settings → Secrets and variables → Actions → Variables): AI_REVIEW=on runs reviews, AI_FIX=on runs fix
+# rounds. Anything else means off. Turn them off if the Claude plan's limits run low.
+#
+# Security (public repo): runs only for same-repo PRs opened by constantinospan, pushed by them or the Claude app.
+# Reviewer jobs get the read-only job token and can't write to GitHub; secrets are hidden from the commands Claude
+# runs (CLAUDE_CODE_SUBPROCESS_ENV_SCRUB). Only the verdict job (no Claude, no PR code) writes comments, labels,
+# the ai-review status and the review-screenshots branch. Keep show_full_output off (logs are public).
+name: AI review
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions: {} # every job asks for what it needs
+
+jobs:
+  gate:
+    if: >-
+      vars.AI_REVIEW == 'on' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.actor.login == 'constantinospan' || github.event.workflow_run.actor.login == 'claude[bot]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      found: ${{ steps.pr.outputs.found }}
+      number: ${{ steps.pr.outputs.number }}
+      rounds: ${{ steps.pr.outputs.rounds }}
+      sha: ${{ github.event.workflow_run.head_sha }}
+      branch: ${{ github.event.workflow_run.head_branch }}
+      play: ${{ steps.scope.outputs.play }}
+      code: ${{ steps.scope.outputs.code }}
+      rules_changed: ${{ steps.scope.outputs.rules_changed }}
+      games: ${{ steps.scope.outputs.games }}
+    steps:
+      - name: Find the PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          # The name ends up in a tool rule for the fix run, so only plain characters.
+          if ! [[ "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "::warning::The branch name has unusual characters, so it isn't reviewed."
+            exit 0
+          fi
+          prs=$(gh api "repos/${REPO}/commits/${SHA}/pulls" --jq '[.[] | select(.state == "open" and .base.ref == "main"
+            and .head.ref == $ENV.BRANCH and .head.repo.full_name == $ENV.REPO and .user.login == "constantinospan")]')
+          count=$(jq length <<<"$prs")
+          if [ "$count" != 1 ]; then
+            echo "::notice::Found ${count} open PRs by the owner for this commit (need exactly 1). Not reviewed."
+            exit 0
+          fi
+          if [ "$(jq -r '.[0].head.sha' <<<"$prs")" != "$SHA" ]; then
+            echo "::notice::The PR has newer commits. They're reviewed after their own CI run."
+            exit 0
+          fi
+          {
+            echo "number=$(jq -r '.[0].number' <<<"$prs")"
+            echo "rounds=$(jq '[.[0].labels[].name | select(. == "ai-fix-1" or . == "ai-fix-2")] | length' <<<"$prs")"
+            echo "found=true"
+          } >> "$GITHUB_OUTPUT"
+      - if: ${{ steps.pr.outputs.found == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - if: ${{ steps.pr.outputs.found == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          path: pr
+          fetch-depth: 0 # the diff against main needs the shared history
+          persist-credentials: false
+      - if: ${{ steps.pr.outputs.found == 'true' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Which reviewers are needed
+        if: ${{ steps.pr.outputs.found == 'true' }}
+        id: scope
+        run: |
+          set -o pipefail # a crash in the script must fail the step, not pass through tee
+          node tools/review/scope.mjs pr | tee -a "$GITHUB_OUTPUT"
+
+  play-review:
+    needs: gate
+    if: ${{ needs.gate.outputs.found == 'true' && needs.gate.outputs.play == 'true' }}
+    # Same machine as CI, so the screenshots look like CI's pictures.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency: # a newer review of the same PR replaces this one
+      group: ai-review-play-${{ needs.gate.outputs.branch }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    env:
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
+    outputs:
+      result: ${{ steps.claude.outputs.structured_output }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci # main's packages: Playwright for the browser scripts
+      - name: Restore test browsers
+        id: browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        run: npx playwright install --with-deps chromium webkit
+      - if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
+        run: npx playwright install-deps chromium webkit
+      - name: Collect the review inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ needs.gate.outputs.number }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: tools/review/collect-inputs.sh review-input pr
+      - name: Serve the PR's site
+        run: |
+          nohup node pr/tests/serve.mjs 4173 > "$RUNNER_TEMP/serve.log" 2>&1 &
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:4173/logic-lane/ && exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/serve.log"; exit 1
+      - name: Standard screenshots, console errors and outside requests
+        env:
+          GAMES: ${{ needs.gate.outputs.games }}
+        run: |
+          read -ra games <<<"$GAMES"
+          node tools/review/shots.mjs http://localhost:4173/logic-lane/ review-shots "${games[@]}"
+      # Saved before the AI starts, so it can't change or drop what the fixed checks found (D19).
+      - name: Keep the standard screenshots and report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-shots-fixed
+          path: review-shots/
+          retention-days: 14
+      - name: Result format
+        id: schema
+        run: echo "json=$(jq -c . tools/review/schema.json)" >> "$GITHUB_OUTPUT"
+      - id: claude
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }} # read-only: the reviewer can't write to GitHub
+          allowed_bots: claude # re-reviews after a fix push are started by the Claude app
+          prompt: |
+            Read tools/review/prompts/play.md and follow it.
+            PR #${{ needs.gate.outputs.number }}, commit ${{ needs.gate.outputs.sha }}.
+          claude_args: >-
+            --max-turns 80
+            --json-schema '${{ steps.schema.outputs.json }}'
+            --allowedTools "Read,Glob,Grep,Write,Bash(node review-tmp/:*),Bash(node tools/review/shots.mjs:*),Bash(git -C pr diff:*),Bash(git -C pr log:*),Bash(git -C pr show:*),Bash(ls:*)"
+            --disallowedTools "Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
+      - name: Keep the reviewer's extra screenshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-shots-extra
+          path: review-shots/extra-*.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+  code-review:
+    needs: gate
+    if: ${{ needs.gate.outputs.found == 'true' && needs.gate.outputs.code == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: ai-review-code-${{ needs.gate.outputs.branch }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    env:
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
+    outputs:
+      result: ${{ steps.claude.outputs.structured_output }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Collect the review inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ needs.gate.outputs.number }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: tools/review/collect-inputs.sh review-input pr
+      - name: Result format
+        id: schema
+        run: echo "json=$(jq -c . tools/review/schema.json)" >> "$GITHUB_OUTPUT"
+      - id: claude
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          allowed_bots: claude
+          prompt: |
+            Read tools/review/prompts/code.md and follow it.
+            PR #${{ needs.gate.outputs.number }}, commit ${{ needs.gate.outputs.sha }}.
+          claude_args: >-
+            --max-turns 60
+            --json-schema '${{ steps.schema.outputs.json }}'
+            --allowedTools "Read,Glob,Grep,Bash(git -C pr diff:*),Bash(git -C pr log:*),Bash(git -C pr show:*),Bash(git -C pr blame:*),Bash(ls:*)"
+            --disallowedTools "Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
+
+  verdict:
+    needs: [gate, play-review, code-review]
+    # Runs even when one reviewer was skipped (not needed) or failed: a failed reviewer is reported, never ✅.
+    if: >-
+      !cancelled() && needs.gate.outputs.found == 'true' &&
+      (needs.gate.outputs.play == 'true' || needs.gate.outputs.code == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: ai-review-verdict-${{ needs.gate.outputs.branch }}
+      cancel-in-progress: false
+    permissions:
+      contents: write # only for the review-screenshots branch
+      pull-requests: write
+      issues: write # labels
+      statuses: write
+    outputs:
+      fix: ${{ steps.verdict.outputs.fix }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ needs.gate.outputs.number }}
+      HEAD_SHA: ${{ needs.gate.outputs.sha }}
+    steps:
+      # main only. This job can write, so it never checks out or runs the PR's code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Still the PR's latest commit?
+        id: current
+        run: |
+          head=$(gh api "repos/${REPO}/pulls/${PR}" --jq .head.sha)
+          if [ "$head" = "$HEAD_SHA" ]; then echo "current=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::The PR moved on to ${head}; that commit gets its own review."; fi
+      # Extras first, then the fixed set on top, so the fixed report and pictures always win.
+      - if: ${{ steps.current.outputs.current == 'true' && needs.gate.outputs.play == 'true' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # the reviewer may have saved none
+        with:
+          name: review-shots-extra
+          path: review-shots
+      - if: ${{ steps.current.outputs.current == 'true' && needs.gate.outputs.play == 'true' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # no pictures is reported in the comment, not a crash
+        with:
+          name: review-shots-fixed
+          path: review-shots
+      - name: Publish the screenshots
+        if: ${{ steps.current.outputs.current == 'true' && needs.gate.outputs.play == 'true' }}
+        id: shots
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          pngs=(review-shots/*.png)
+          [ "${#pngs[@]}" -gt 0 ] || exit 0
+          dir="pr-${PR}/${HEAD_SHA:0:7}"
+          work="${RUNNER_TEMP}/shots"
+          git init -q "$work"
+          cd "$work"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config http.https://github.com/.extraheader \
+            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git remote add origin "https://github.com/${REPO}.git"
+          # Two PRs can publish at once: start from the branch's latest commit, retry if someone else got there first.
+          for i in 1 2 3 4 5; do
+            if git fetch -q --depth 1 origin review-screenshots 2>/dev/null; then
+              git checkout -q -B review-screenshots FETCH_HEAD
+            else
+              git symbolic-ref HEAD refs/heads/review-screenshots # first time: a branch with no history
+            fi
+            mkdir -p "$dir"
+            cp "${pngs[@]/#/$GITHUB_WORKSPACE/}" "$dir/"
+            git add "$dir"
+            git commit -qm "Screenshots for PR #${PR} at ${HEAD_SHA:0:7}" || true
+            if git push -q origin HEAD:refs/heads/review-screenshots; then
+              # Linked by commit, so cached pictures can never be an older version.
+              echo "base=https://raw.githubusercontent.com/${REPO}/$(git rev-parse HEAD)/${dir}/" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep $((i * 3))
+          done
+          echo "::warning::Couldn't publish the screenshots."
+      - name: Build the verdict
+        if: ${{ steps.current.outputs.current == 'true' }}
+        id: verdict
+        env:
+          PLAY_NEEDED: ${{ needs.gate.outputs.play }}
+          PLAY_JOB: ${{ needs.play-review.result }}
+          PLAY_JSON: ${{ needs.play-review.outputs.result }}
+          CODE_NEEDED: ${{ needs.gate.outputs.code }}
+          CODE_JOB: ${{ needs.code-review.result }}
+          CODE_JSON: ${{ needs.code-review.outputs.result }}
+          RULES_CHANGED: ${{ needs.gate.outputs.rules_changed }}
+          SHOTS_DIR: review-shots
+          SHOTS_BASE: ${{ steps.shots.outputs.base }}
+          FIX_ROUNDS: ${{ needs.gate.outputs.rounds }}
+          AI_FIX: ${{ vars.AI_FIX }}
+        run: |
+          set -o pipefail
+          node tools/review/verdict.mjs "${RUNNER_TEMP}/verdict" | tee -a "$GITHUB_OUTPUT"
+      - name: Post the verdict
+        if: ${{ steps.verdict.outputs.state && steps.verdict.outputs.state != 'none' }}
+        env:
+          STATE: ${{ steps.verdict.outputs.state }}
+          STATUS: ${{ steps.verdict.outputs.status }}
+          FIX: ${{ steps.verdict.outputs.fix }}
+          AI_FIX: ${{ vars.AI_FIX }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh label create needs-you --repo "$REPO" --color d93f0b --description 'Waiting for the owner' 2>/dev/null || true
+          gh pr comment "$PR" --repo "$REPO" --body-file "${RUNNER_TEMP}/verdict/comment.md"
+          case "$STATE" in pass) s=success ;; fail) s=failure ;; *) s=error ;; esac
+          gh api "repos/${REPO}/statuses/${HEAD_SHA}" -f state="$s" -f context=ai-review \
+            -f description="$STATUS" -f target_url="$RUN_URL" > /dev/null
+          # Over to the owner when the review didn't finish, or when it failed and no fix round will run.
+          if [ "$STATE" = incomplete ] || { [ "$STATE" = fail ] && [ "$AI_FIX" = on ] && [ "$FIX" != true ]; }; then
+            gh pr edit "$PR" --repo "$REPO" --add-label needs-you
+          fi
+      - name: Say so if the verdict couldn't be built
+        if: ${{ failure() && steps.current.outputs.current == 'true' && steps.verdict.outcome != 'success' }}
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create needs-you --repo "$REPO" --color d93f0b --description 'Waiting for the owner' 2>/dev/null || true
+          gh pr comment "$PR" --repo "$REPO" --body "⚠️ The AI review couldn't build its verdict, so there's no result for \`${HEAD_SHA:0:7}\`. Log: ${RUN_URL}"
+          gh api "repos/${REPO}/statuses/${HEAD_SHA}" -f state=error -f context=ai-review \
+            -f description="Verdict failed" -f target_url="$RUN_URL" > /dev/null
+          gh pr edit "$PR" --repo "$REPO" --add-label needs-you
+      - name: Keep the Blocking list for the fix run
+        if: ${{ steps.verdict.outputs.fix == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: blocking
+          path: ${{ runner.temp }}/verdict/blocking.md
+          retention-days: 14
+
+  # D17: works through the Blocking items on the PR's own branch, then pushes. The push starts CI (held until the
+  # owner taps "Approve and run workflows"), and a green CI run starts this workflow again: that's round 2.
+  fix:
+    needs: [gate, verdict]
+    if: ${{ !cancelled() && needs.verdict.result == 'success' && needs.verdict.outputs.fix == 'true' && vars.AI_FIX == 'on' }}
+    runs-on: ubuntu-24.04 # same machine and browsers as CI and the builder, so new pictures match
+    timeout-minutes: 60
+    concurrency: # never cancelled halfway through its push
+      group: ai-review-fix-${{ needs.gate.outputs.branch }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write # for the Claude app token, whose push starts CI (the job token's wouldn't)
+      actions: read
+    env: # no GitHub token here: the PR's own install scripts and tests run in this job
+      REPO: ${{ github.repository }}
+      PR: ${{ needs.gate.outputs.number }}
+      HEAD_SHA: ${{ needs.gate.outputs.sha }}
+      BRANCH: ${{ needs.gate.outputs.branch }}
+      VISUAL: '1'
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
+    steps:
+      # Before a round is used up: if the branch moved, the new commit gets its own review instead.
+      - name: Still the reviewed commit?
+        id: head
+        run: |
+          now=$(git ls-remote "https://github.com/${REPO}.git" "refs/heads/${BRANCH}" | cut -f1)
+          if [ "$now" != "$HEAD_SHA" ]; then
+            echo "::error::The branch moved on since the review. The new commit gets its own review."
+            exit 1
+          fi
+      # Counted before Claude starts, so the 2-round limit never depends on what Claude writes.
+      - name: Count this fix round
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROUNDS: ${{ needs.gate.outputs.rounds }}
+        run: |
+          label="ai-fix-$((ROUNDS + 1))"
+          gh label create "$label" --repo "$REPO" --color c5def5 --description 'Automatic fix round used' 2>/dev/null || true
+          gh pr edit "$PR" --repo "$REPO" --add-label "$label"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.gate.outputs.branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checked out the reviewed commit?
+        run: test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+      # Like the action does on PR runs (it doesn't on workflow_run): agent files come from main, the PR's copies go
+      # to .claude-pr/ for reference, nothing is staged. Keeps CLAUDE.md's "rule files on PR runs" section true.
+      - name: Agent rules from main
+        run: |
+          set -euo pipefail
+          paths=(.claude .mcp.json .claude.json .gitmodules .ripgreprc CLAUDE.md CLAUDE.local.md .husky)
+          rm -rf .claude-pr
+          for p in "${paths[@]}"; do
+            if [ -e "$p" ]; then mkdir -p ".claude-pr/$(dirname "$p")"; cp -R "$p" ".claude-pr/$p"; fi
+            rm -rf "$p"
+            git checkout origin/main -- "$p" 2>/dev/null || true
+          done
+          git reset -q -- "${paths[@]}"
+          printf '/.claude-pr/\n/review-input/\n' >> .git/info/exclude
+          mkdir -p review-input
+          git show origin/main:tools/review/prompts/fix.md > review-input/fix-instructions.md
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: blocking
+          path: review-input
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        env:
+          CLAUDE_BRANCH: ${{ needs.gate.outputs.branch }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: claude
+          additional_permissions: |
+            actions: read
+          prompt: |
+            Read review-input/fix-instructions.md and follow it. The Blocking items are in review-input/blocking.md.
+            PR #${{ needs.gate.outputs.number }}, branch ${{ needs.gate.outputs.branch }}.
+          claude_args: >-
+            --max-turns 120
+            --allowedTools "Read,Glob,Grep,Write,Edit,MultiEdit,Bash(npm ci),Bash(npm run check),Bash(npm test:*),Bash(npm run typecheck),Bash(npm run test:e2e:*),Bash(npx playwright test:*),Bash(npx vitest:*),Bash(git log:*),Bash(git show:*),Bash(git status),Bash(git diff:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD:${{ needs.gate.outputs.branch }})"
+            --disallowedTools "WebFetch,WebSearch"
+      - name: Report
+        if: ${{ always() && steps.head.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          # Not via origin: the action has revoked the app token it put there by now.
+          now=$(git ls-remote "https://github.com/${REPO}.git" "refs/heads/${BRANCH}" | cut -f1)
+          # A push counts only if it builds on the reviewed commit (not someone else's push meanwhile).
+          if [ -n "$now" ] && [ "$now" != "$HEAD_SHA" ] &&
+            [ "$(gh api "repos/${REPO}/compare/${HEAD_SHA}...${now}" --jq .status 2>/dev/null)" = ahead ]; then
+            pushed=true
+          else
+            pushed=false
+          fi
+          body="${RUNNER_TEMP}/fix-comment.md"
+          {
+            echo '## 🔧 Automatic fix round'
+            echo
+            if [ -s review-input/fix-comment.md ]; then
+              # No @-mentions from the report (they would notify people).
+              sed 's/@/@\xe2\x80\x8b/g' review-input/fix-comment.md
+            else
+              echo "_The fix run didn't write a report. Its log: ${RUN_URL}_"
+            fi
+            echo
+            echo '---'
+            if [ "$pushed" = true ]; then
+              echo "Pushed \`${now:0:7}\`. GitHub holds its tests until you approve them: open this PR in a browser" \
+                "and tap **Approve and run workflows**. The tests then run, and the review runs again after them."
+            else
+              echo "Nothing was pushed, so this is over to you (label \`needs-you\`). Log: ${RUN_URL}"
+            fi
+          } > "$body"
+          gh label create needs-you --repo "$REPO" --color d93f0b --description 'Waiting for the owner' 2>/dev/null || true
+          gh pr comment "$PR" --repo "$REPO" --body-file "$body"
+          if [ "$pushed" != true ]; then gh pr edit "$PR" --repo "$REPO" --add-label needs-you; fi

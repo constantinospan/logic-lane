@@ -150,13 +150,34 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - The action cannot edit `.github/workflows/*`. Pipeline changes go through a local session, or by hand
   (claude.ai/code may share the same limit; untested).
 - On PR runs the action restores `CLAUDE.md` and `.claude/` from the base branch; PR versions go to `.claude-pr/`.
-- Screenshots: no native PR image upload. Reviewer commits screenshots to a dedicated `review-screenshots` branch
-  and embeds the links in its PR comment.
+- Screenshots: no native PR image upload. The review workflow (not the AI) commits them to a dedicated
+  `review-screenshots` branch, in `pr-<n>/<sha7>/`, kept for good (owner, 2026-11-14), and embeds them in the verdict
+  comment, linked by commit so caches never show old pictures. That branch has no CI and is never merged.
 - Public-repo hygiene: keep `show_full_output` off (logs are public); limit comments Claude reads to the owner
   (`include_comments_by_actor`); only `@claude` on the owner's own issues.
 - Branch protection on `main`: tests must pass before merge.
 - Squash merges only (merge commits and rebase merging are off): one commit per PR, so reverting is always one step.
 - Reviewer is a separate run with a strict, critical prompt and checklist; the parent is the final judge.
+- Reviewers run in `.github/workflows/review.yml`, started by `workflow_run` when CI passes (decided 2026-11-14, step
+  6b). GitHub always runs `main`'s copy of a `workflow_run` workflow, so a PR can't change the review that judges it.
+  For the same reason the workflow checks out `main` at the workspace root (rules, prompts, scripts in
+  `tools/review/`) and the PR's code in `pr/`. The action doesn't restore the agent files from `main` on
+  `workflow_run`, so the fix job does it itself, the same way.
+  - Runs only for same-repo PRs opened by `constantinospan` and pushed by them or the Claude app (`allowed_bots:
+    claude`, so re-reviews after a fix push work).
+  - Reviewer jobs use the read-only job token and can't write to GitHub. Secrets are hidden from the commands Claude
+    runs (`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`). What they read is collected for them first (`review-input/`).
+  - Only the verdict job writes (comment, labels, the `ai-review` commit status, the screenshots branch). It has no
+    AI and never runs the PR's code.
+  - Known leftover risk, accepted because only the owner's own PRs are reviewed: the play reviewer can run Node
+    scripts it writes, with network access, in a job where the Claude token exists in the parent process. Text in a
+    PR that steered it could in theory leak that token. If PRs from anyone else are ever reviewed, sandbox those
+    scripts first.
+  - Switches (repo variables): `AI_REVIEW=on` runs reviews, `AI_FIX=on` runs fix rounds. Anything else is off.
+  - Proof exception (owner, 2026-11-14): a `workflow_run` workflow only runs once it's on `main`, so it can't be
+    proven on GitHub before merge, as "Changing CI" in `CLAUDE.md` asks. It merges switched off, then is proven with
+    throwaway PRs (at least 3 green runs, plus planted problems), and step 6b is ticked only after that. It can't
+    block merges or deploys: the required `test` check doesn't depend on it.
 - Quota: runs share the owner's Max limits. Reviewers run only after tests pass. What runs when is set by D19.
   `CLAUDE.md`, `docs/REVIEW-CHECKLIST.md`, `docs/DECISIONS.md` and `.claude/` never count as docs-only: they're always reviewed.
 
@@ -188,6 +209,13 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Not via bot comments (builder ignores bots by default). The review workflow itself starts a fix run when it
   returns ❌, pushing to the same PR branch, which re-triggers tests + review.
 - Max 2 automatic fix rounds per PR; then stop, add label `needs-you`, owner gets notified.
+- Rounds are counted by labels `ai-fix-1` and `ai-fix-2`, added by the workflow before the AI starts, so the limit
+  never depends on what the AI writes. A fix run that pushes nothing adds `needs-you` (also done by the workflow).
+- The fix run pushes with the Claude app token, so its push starts CI. GitHub holds that run until the owner taps
+  **Approve and run workflows** ("require approval for all outside contributors" is kept, owner 2026-11-14). The
+  fix comment says so. Loosening the setting, or pushing with an owner token, were the rejected alternatives.
+- A review that didn't finish (a reviewer crashed or timed out) is never ✅ and never starts a fix: it's posted as
+  ⚠️ with `needs-you`.
 
 ### D18. Child privacy in a public repo
 - Never put the child's name, photos, school or other identifying details in the repo, issues, PRs or screenshots.
@@ -203,6 +231,12 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
   playing would catch.
 - Both write into one ✅/❌ verdict. The automatic fix loop works from the combined Blocking list (max 2 rounds, D17).
 - Until 6b exists, a fresh agent reviews each PR by hand before it's handed to the owner.
+- Fixed checks don't depend on the AI: `tools/review/shots.mjs` takes the standard screenshots (home, and each
+  affected game's picker and first Easy puzzle, at all three sizes) and logs console errors and requests to other
+  sites. Those two are Blocking automatically. They're saved before the AI starts, so it can't change them. The play reviewer drives the browser with the repo's existing
+  Playwright (no new package).
+- The verdict is built by a plain script (`tools/review/verdict.mjs`) from both reviewers' structured answers. It
+  also sets the `ai-review` commit status on the PR (not a required check).
 
 ### D20. Keeping CI short as games are added (decided 2026-11-14)
 Goal: CI stays around 2 minutes however many games there are. Each game adds roughly 45 browser tests; without
