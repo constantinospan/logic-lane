@@ -149,4 +149,5 @@ pushes nothing (it skipped every item, or checks still fail), it says so plainly
 the `needs-you` label so the PR doesn't sit unnoticed.
 
 There are at most 2 fix rounds per PR, counted by the `ai-fix-1` and `ai-fix-2` labels the workflow adds. After that
-the PR gets the `needs-you` label. GitHub holds the tests on each fix push until the owner approves them.
+the PR gets the `needs-you` label. A fix run that skips an item on purpose writes the count to
+`review-input/skipped-count`; the workflow then adds `needs-you` and stops the automatic rounds.

@@ -21,7 +21,10 @@ copies; the PR's own copies are in `.claude-pr/`.
    `CLAUDE.md` or `.claude/` only if a Blocking item is about them, starting from the `.claude-pr/` copy as
    `CLAUDE.md` says. Commit with a short message, then `git push origin HEAD:<branch>` (the branch is in the
    prompt).
-5. Write your report for the owner to `review-input/fix-comment.md` (the workflow posts it on the PR): what you
+5. Write the number of items you skipped on purpose (left for the owner to decide) to `review-input/skipped-count`,
+   just the number, e.g. `0`. If it's more than 0, the workflow stops the automatic rounds and hands the PR to the
+   owner.
+6. Write your report for the owner to `review-input/fix-comment.md` (the workflow posts it on the PR): what you
    fixed, what you skipped and why, and whether checks passed. Plain English, short. Never claim checks passed if you
    didn't run them. Never write a child's name or personal details.
 
