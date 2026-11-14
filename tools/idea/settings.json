@@ -1,0 +1,5 @@
+{
+  "enabled": false,
+  "passMark": 75,
+  "weights": { "major": 15, "question": 10, "minor": 5 }
+}

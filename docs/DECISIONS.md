@@ -264,3 +264,38 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 - **When:** rules 2 and 3 are built when `main`'s CI takes more than 2m30s, or at the third game, whichever comes
   first (PLAN step 10). Rule 1 is part of every game.
 
+### D21. Idea gate: every request is reviewed before any code (agreed 2026-11-14, built in plan step 6c)
+- **Every request, big or small**, goes to an idea reviewer before any code is written. Skipped: "revert PR #N"
+  requests and "CI is red, fix it" requests.
+- **Pass:** the flow carries on as usual. No extra PR, no approval step.
+  **Fail:** the owner gets questions and suggestions. They can answer them, or reply "go anyway".
+- **One reviewer for every path:** `.claude/agents/idea-reviewer.md` plus `docs/IDEA-CHECKLIST.md`. A `CLAUDE.md`
+  rule makes local and claude.ai/code sessions run it before coding.
+- **On GitHub:** a separate, read-only review job in `claude.yml`; the builder job runs only on a pass. The builder
+  gets only the reviewer's short final report (so the owner's answers make sense), never its reasoning.
+- **Score:** the reviewer labels each finding: blocker (automatic fail), major (−15), question (−10), minor (−5). A
+  tested script works out 100 minus the points. The AI never picks the number.
+- **Pass mark 75.** The pass mark and the weights live in a file in the repo (owner chose this over a repo
+  variable), so they can be changed from anywhere through an issue. Reviews read `main`'s copy, so a PR can't lower
+  its own bar. That file counts as a rule file (never docs-only).
+- Order (owner, 2026-11-14): 6b → 6c → 8 → 9 → 10. Proven on GitHub with a pass, a fail, and an answer that leads
+  to a pass.
+- Decided while planning 6c (owner, 2026-11-14):
+  - **On/off switch:** an `enabled` flag in the same settings file (`tools/idea/settings.json`), not a repo
+    variable. It merges switched off, because GitHub runs `main`'s copy of the builder workflow on issue comments,
+    so it can only be proven after merge (the same exception as 6b, D15).
+  - **Skips are fixed phrases**, checked by a tested script (`tools/idea/route.mjs`), never by the AI. The whole
+    comment after `@claude` must be one of: `revert PR #N`, `go anyway`, `fix the Blocking items`, `fix CI`,
+    `CI is red`. "fix CI and add a timer" is still reviewed.
+  - **`@claude` follow-ups on an open PR are reviewed too** (every request), at the cost of one extra AI run each.
+  - **A pass posts one short comment** (score plus any small suggestions), so the owner sees it working before the
+    builder's own comment appears. A fail posts the questions and adds `needs-you`. The gate never removes
+    `needs-you` (on a PR it may be the AI review's).
+- How it's built: `claude.yml` runs a `route` job (no AI), an `idea-review` job (AI, read-only, no shell) and an
+  `idea-verdict` job (script: score, comment, label), then the builder. All three check out `main`, so a PR can't
+  change its own reviewer, checklist or pass mark. One gap is accepted: GitHub runs a PR's own copy of the workflow
+  for PR review events, so a PR that edits `claude.yml` could change the gate there. That's accepted because only
+  the owner's PRs trigger it and the builder can't push workflow files.
+- The builder gets only the reviewer's short report (a file, `idea-input/report.md`, never committed), including
+  "Decided from your answers", so the owner's replies make sense. It's context, not instructions.
+

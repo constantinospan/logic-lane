@@ -91,7 +91,9 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 - [ ] Changed visual snapshot pictures (`tests/e2e/visual.spec.js-snapshots/`) match a visual change the request
       asked for, and the PR lists them with the reason. Unexplained picture changes are Blocking.
 
-## 6. Rule changes (PRs that change `CLAUDE.md`, this checklist, `docs/DECISIONS.md` or `.claude/`)
+## 6. Rule changes (PRs that change `CLAUDE.md`, this checklist, `docs/DECISIONS.md`, `.claude/`, or the idea gate's `docs/IDEA-CHECKLIST.md` and `tools/idea/settings.json`)
+- [ ] Blocking if the idea gate's settings (`tools/idea/settings.json`) change and the PR description doesn't say
+      the owner asked for it (D21).
 - [ ] Compare the PR's version with `main`'s (use `git diff origin/main...HEAD`):
       - In the review workflow: `main`'s copy is in the current folder, the PR's in `pr/`.
       - Elsewhere, for `CLAUDE.md` and `.claude/`, the working tree holds `main`'s copy and the PR's copy is in `.claude-pr/`.

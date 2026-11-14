@@ -19,3 +19,6 @@ _site/
 review-tmp/
 review-shots/
 review-input/
+
+# Idea gate scratch folder (tools/idea)
+idea-input/
