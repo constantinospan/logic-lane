@@ -13,6 +13,8 @@ export function renderHome(root) {
     location.hash = '#/reset';
   });
 
+  const greeting = h('p', { className: 'home-greeting', text: "Let's play!" });
+
   const tiles = h('div', { className: 'tiles' });
   for (const game of GAMES.filter((g) => !g.hidden)) {
     const tile = h('a', { className: 'tile' }, [
@@ -32,6 +34,6 @@ export function renderHome(root) {
     );
   }
 
-  root.replaceChildren(h('main', { className: 'screen home' }, [title, tiles]));
+  root.replaceChildren(h('main', { className: 'screen home' }, [title, greeting, tiles]));
   return stopHold;
 }

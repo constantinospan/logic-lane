@@ -168,6 +168,12 @@ button {
   position: relative;
 }
 
+.home-greeting {
+  margin: 0 0 16px;
+  font-size: 1.3rem;
+  color: var(--ink-soft);
+}
+
 .home-title.holding {
   opacity: calc(1 - var(--hold, 0) * 0.6);
 }
