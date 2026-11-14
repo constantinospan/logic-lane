@@ -86,10 +86,11 @@ jobs:
             test-results/
           retention-days: 14
 
-  # The required check on main. Passes only if every part above passed. `always()` matters: without it this job
-  # would be skipped when a part fails, and GitHub counts a skipped required check as passed.
+  # The required check on main. Passes only if every part above passed. It must never be skipped, because GitHub
+  # counts a skipped required check as passed: `always()` keeps it running when a part fails, and on a manual snapshot
+  # run (where the parts don't run) it goes red on purpose, so that run can't make a red PR look mergeable.
   test:
-    if: ${{ always() && !inputs.update_snapshots }}
+    if: ${{ always() }}
     needs: [checks, browser]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
