@@ -63,14 +63,32 @@ describe('storage', () => {
     expect(store.load(versionOf)).toBeNull();
   });
 
-  it('works without storage, and never throws when storage fails', () => {
+  it('returns nothing when nothing was saved', () => {
+    expect(store.load(versionOf)).toBeNull();
+  });
+
+  it('without browser storage, falls back to memory so she can still play', () => {
     const blocked = createStore({ backend: null });
     blocked.save(record);
+    expect(blocked.load(versionOf)).toMatchObject({ level: 3 });
+    blocked.clearAll();
     expect(blocked.load(versionOf)).toBeNull();
+  });
+
+  it('when storage fails mid-game (e.g. full), keeps going from memory and never throws', () => {
     const failing = createStore({
-      backend: { ...memoryBackend(), setItem: () => { throw new Error('quota'); } },
+      backend: { ...memoryBackend(), setItem: () => { throw new Error('QuotaExceededError'); } },
     });
     expect(() => failing.save(record)).not.toThrow();
+    expect(failing.load(versionOf)).toMatchObject({ level: 3 });
+  });
+
+  it('never throws when removing fails', () => {
+    const broken = createStore({
+      backend: { ...memoryBackend(), removeItem: () => { throw new Error('nope'); }, keys: () => { throw new Error('nope'); } },
+    });
+    expect(() => broken.clear()).not.toThrow();
+    expect(() => broken.clearAll()).not.toThrow();
   });
 
   it('clearAll removes only logic-lane keys', () => {

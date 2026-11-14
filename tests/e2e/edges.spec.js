@@ -32,16 +32,18 @@ test('reloading during the celebration goes to the next puzzle, not the same one
   expect(after.seed).not.toBe(before.seed);
 });
 
-test('leaving during the celebration does not pop a puzzle onto another screen', async ({ page }) => {
-  // (The leftover-timer case that could overwrite a new game's save is tested separately below.)
+test('leaving during the celebration stops it: nothing pops up or gets saved later', async ({ page }) => {
+  await page.clock.install(); // we move time forward ourselves
   await startDemo(page);
   await tapRightChoice(page);
   await expect(page.locator('.celebrate')).toBeVisible();
   await page.evaluate(() => (location.hash = '#/'));
-  await page.waitForTimeout(2000); // longer than the celebration
   await expect(page.locator('.home-title')).toBeVisible();
+  const saved = await readSave(page);
+  await page.clock.runFor(5000); // well past the celebration
   await expect(page.locator('.demo-choice')).toHaveCount(0);
   await expect(page.locator('.celebrate')).toHaveCount(0);
+  expect(await readSave(page)).toEqual(saved); // a leftover timer would have re-saved (new savedAt)
 });
 
 test('two very quick taps on the right answer count once', async ({ page }) => {
@@ -86,7 +88,7 @@ test('a corrupt save is ignored', async ({ page }) => {
   await expect(page.locator('.demo-choice').first()).toBeVisible();
 });
 
-test('with storage blocked, the game still works (just without resume)', async ({ page, context }) => {
+test('with storage blocked (Safari "Block All Cookies"), she can still play', async ({ page, context }) => {
   await context.addInitScript(() => {
     Object.defineProperty(window, 'localStorage', {
       get() {
@@ -96,9 +98,40 @@ test('with storage blocked, the game still works (just without resume)', async (
   });
   await page.goto('./#/game/demo');
   await page.locator('.choice-easy').click();
-  // No save, so play can't start: the picker stays. The app must not crash.
-  await expect(page.locator('.choice-easy')).toBeVisible();
-  await expect(page.locator('.home-title, .picker-title').first()).toBeVisible();
+  await expect(page).toHaveURL(/#\/play\/demo$/);
+  await expect(page.locator('.demo-choice').first()).toBeVisible();
+  await tapRightChoice(page);
+  await expect(page.locator('.celebrate')).toBeVisible();
+  await expect(page.locator('.celebrate')).toHaveCount(0, { timeout: 5000 });
+  await expect(page.locator('.demo-choice').first()).toBeVisible();
+});
+
+test('if storage fills up mid-game, she keeps playing', async ({ page, context }) => {
+  await context.addInitScript(() => {
+    const realSet = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'logic-lane:resume' && /** @type {any} */ (window).__full) {
+        throw new DOMException('Full', 'QuotaExceededError');
+      }
+      return realSet.call(this, key, value);
+    };
+  });
+  await startDemo(page);
+  await page.evaluate(() => {
+    /** @type {any} */ (window).__full = true;
+  });
+  for (let i = 0; i < 2; i++) {
+    await tapRightChoice(page);
+    await expect(page.locator('.celebrate')).toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator('.demo-choice').first()).toBeVisible();
+  }
+});
+
+test('unknown addresses end up on the home screen', async ({ page }) => {
+  for (const path of ['./#/play/nope', './#/game/nope', './#/whatever', './#/play/']) {
+    await page.goto(path);
+    await expect(page.locator('.home-title'), path).toBeVisible();
+  }
 });
 
 test('without speech support the speaker is hidden and nothing breaks', async ({ page, context }) => {
@@ -106,7 +139,10 @@ test('without speech support the speaker is hidden and nothing breaks', async ({
     Object.defineProperty(window, 'speechSynthesis', { value: undefined, configurable: true });
   });
   await startDemo(page);
-  await expect(page.getByRole('button', { name: 'Read it to me' })).toBeHidden();
+  const speaker = page.locator('.topbar .icon-button[aria-label="Read it to me"]');
+  await expect(speaker).toHaveCount(1); // still there (keeps the bar balanced), just hidden
+  await expect(speaker).toHaveAttribute('hidden', '');
+  await expect(speaker).toBeHidden();
   await tapRightChoice(page);
   await expect(page.locator('.celebrate')).toBeVisible();
 });

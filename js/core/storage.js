@@ -1,4 +1,6 @@
 // The ONLY module that touches localStorage (CLAUDE.md, D7).
+// If storage is blocked or full (e.g. Safari "Block All Cookies"), it falls back to memory: she can always play,
+// she just loses resume when the page reloads.
 // One resume slot: the game in progress. It survives refresh, app swipe-away and the tablet killing the app,
 // and expires 3 hours after the last save. Every key is prefixed, because all of this account's
 // *.github.io sites share one origin (D16).
@@ -27,27 +29,46 @@ export const RESUME_WINDOW_MS = 3 * 60 * 60 * 1000;
  * @property {() => string[]} keys
  */
 
-/** @returns {Backend | null} */
+/**
+ * Storage that only lasts until the page reloads. Used when the browser won't let us save.
+ * @returns {Backend}
+ */
+export function memoryBackend() {
+  /** @type {Map<string, string>} */
+  const map = new Map();
+  return {
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => void map.set(k, v),
+    removeItem: (k) => void map.delete(k),
+    keys: () => [...map.keys()],
+  };
+}
+
+/** @returns {Backend | null} null if localStorage is missing, blocked or full. */
 function browserBackend() {
   try {
     const ls = globalThis.localStorage;
     if (!ls) return null;
+    const probe = `${PREFIX}probe`;
+    ls.setItem(probe, '1'); // throws when blocked or full
+    ls.removeItem(probe);
     return {
       getItem: (k) => ls.getItem(k),
       setItem: (k, v) => ls.setItem(k, v),
       removeItem: (k) => ls.removeItem(k),
-      keys: () => Array.from({ length: ls.length }, (_, i) => ls.key(i) ?? ''),
+      keys: () => Array.from({ length: ls.length }, (_, i) => ls.key(i)).filter((k) => k !== null),
     };
   } catch {
-    return null; // Storage blocked (private mode, settings): the game still works, just without resume.
+    return null;
   }
 }
 
 /**
- * @param {{ backend?: Backend | null, now?: () => number }} [options]  Injectable for tests.
+ * @param {{ backend?: Backend | null, now?: () => number }} [options]  Injectable for tests. `backend: null` means
+ *   "no usable browser storage", which falls back to memory.
  */
 export function createStore(options = {}) {
-  const backend = options.backend === undefined ? browserBackend() : options.backend;
+  let backend = (options.backend === undefined ? browserBackend() : options.backend) ?? memoryBackend();
   const now = options.now ?? (() => Date.now());
 
   /** @param {() => void} fn */
@@ -62,8 +83,13 @@ export function createStore(options = {}) {
   return {
     /** @param {ResumeRecord} record */
     save(record) {
-      if (!backend) return;
-      safely(() => backend.setItem(RESUME_KEY, JSON.stringify({ ...record, savedAt: now() })));
+      const value = JSON.stringify({ ...record, savedAt: now() });
+      try {
+        backend.setItem(RESUME_KEY, value);
+      } catch {
+        backend = memoryBackend(); // storage became full or blocked mid-game: keep playing from memory
+        backend.setItem(RESUME_KEY, value);
+      }
     },
 
     /**
@@ -74,7 +100,6 @@ export function createStore(options = {}) {
      * @returns {ResumeRecord | null}
      */
     load(versionOf) {
-      if (!backend) return null;
       /** @type {ResumeRecord | null} */
       let record = null;
       try {
@@ -97,12 +122,11 @@ export function createStore(options = {}) {
     },
 
     clear() {
-      if (backend) safely(() => backend.removeItem(RESUME_KEY));
+      safely(() => backend.removeItem(RESUME_KEY));
     },
 
     /** Emergency reset: removes every logic-lane key, and nothing else. */
     clearAll() {
-      if (!backend) return;
       safely(() => {
         for (const key of backend.keys()) if (key.startsWith(PREFIX)) backend.removeItem(key);
       });

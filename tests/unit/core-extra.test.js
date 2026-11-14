@@ -59,16 +59,17 @@ describe('storage with the real localStorage adapter', () => {
     expect([...ls.map.keys()]).toEqual(['other-site:x']);
   });
 
-  it('works (without resume) when localStorage is missing', () => {
+  it('falls back to memory when localStorage is missing', () => {
     vi.stubGlobal('localStorage', undefined);
     const store = createStore();
     store.save(record);
+    expect(store.load(() => 1)).toMatchObject({ level: 2 });
+    store.clear();
     expect(store.load(() => 1)).toBeNull();
-    expect(() => store.clear()).not.toThrow();
-    expect(() => store.clearAll()).not.toThrow();
   });
 
-  it('works (without resume) when accessing localStorage throws, as in some private modes', () => {
+  it('falls back to memory when accessing localStorage throws (e.g. Safari "Block All Cookies")', () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
       get() {
@@ -78,10 +79,33 @@ describe('storage with the real localStorage adapter', () => {
     try {
       const store = createStore();
       store.save(record);
-      expect(store.load(() => 1)).toBeNull();
+      expect(store.load(() => 1)).toMatchObject({ level: 2 });
     } finally {
-      delete globalThis.localStorage;
+      if (original) Object.defineProperty(globalThis, 'localStorage', original);
+      else delete globalThis.localStorage;
     }
+  });
+
+  it('falls back to memory when localStorage is full from the start', () => {
+    const ls = fakeLocalStorage();
+    ls.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
+    vi.stubGlobal('localStorage', ls);
+    const store = createStore();
+    store.save(record);
+    expect(store.load(() => 1)).toMatchObject({ level: 2 });
+  });
+
+  it('switches to memory when localStorage fills up mid-game', () => {
+    const ls = fakeLocalStorage();
+    vi.stubGlobal('localStorage', ls);
+    const store = createStore(); // probe succeeds
+    ls.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
+    store.save(record);
+    expect(store.load(() => 1)).toMatchObject({ level: 2 });
   });
 
   it('ignores a save that is not an object', () => {
