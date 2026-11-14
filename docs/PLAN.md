@@ -51,6 +51,8 @@ Notes:
 - To do in step 6b: the play reviewer runs only when a shipped file changed (`isShipped` in
   `tests/shipped-files.js`); the code reviewer runs on every non-docs PR (D19).
 - Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.
+- Check in step 9 on the real iPad: a first visit shows no "⬆️ New!" banner. In 6a, WebKit on Linux once showed
+  the banner in an unrelated visual test (cause unknown; visual tests now run without the service worker).
 - Check in step 9 on the real iPad: the 3 s holds (home title, Reset) and the seed long-press aren't cancelled by
   iOS. They're tested in Chromium and WebKit with a mouse, but not yet with real touch on iOS.
 - To do in step 6b: the reviewer and fix runs load `CLAUDE.md` and `docs/REVIEW-CHECKLIST.md` from `main`
