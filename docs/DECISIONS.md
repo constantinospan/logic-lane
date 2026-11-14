@@ -204,3 +204,19 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 - Both write into one ✅/❌ verdict. The automatic fix loop works from the combined Blocking list (max 2 rounds, D17).
 - Until 6b exists, a fresh agent reviews each PR by hand before it's handed to the owner.
 
+### D20. Keeping CI short as games are added (decided 2026-11-14)
+Goal: CI stays around 2 minutes however many games there are. Each game adds roughly 45 browser tests; without
+these rules that's about +17 s per game (10 games: about 4.5 min).
+1. **Heavy checks are unit tests.** Solvability and difficulty over many puzzles run in Node (milliseconds), not in
+   a browser. Each game's browser tests stay few: play, mistake, solve, its screens' pictures. Applies from the
+   first game (step 8).
+2. **A PR runs what it could have broken.** A PR that only changes `games/<id>/` (and that game's tests) runs the
+   shared tests plus that game's tests. Anything outside `games/<id>/` counts as shared and runs everything, so new
+   folders are safe by default. Docs-only PRs run the quick checks. Merges to `main` always run everything
+   before deploy, so a miss blocks the deploy and the live site keeps the last good version. A test enforces
+   that games never import another game's files, so one game's change can't break another.
+3. **Machines grow with the tests.** CI counts the browser tests and starts about one shard per 50 (public repos:
+   free minutes, up to 20 machines at once).
+- **When:** rules 2 and 3 are built when `main`'s CI takes more than 2m30s, or at the third game, whichever comes
+  first (PLAN step 10). Rule 1 is part of every game.
+

@@ -15,6 +15,7 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 6b | AI reviewers | Play reviewer (browser, screenshots) and code reviewer (diff), one verdict, auto-fix loop (max 2) (D19). Added on top of the working loop; expect a few iterations | Claude | 10 min | 1.5–2 h |
 | 8 | Arrow path v1 | Puzzle generator + solver, ~30-level ladder, Easy/Medium/Hard starts, loops later in the ladder | Claude | — | 3–5 h |
 | 9 | Playtest | Install on the tablet, play with her, turn feedback into issues | Me | 20 min + play | — |
+| 10 | Test scaling (D20) | **When `main`'s CI passes 2m30s or at the third game:** PRs run only what they could break, shards grow with the tests, a no-cross-game-imports test | Claude | — | 1–2 h |
 
 **Totals (rough):** you ~1.5 h spread across steps 1, 2, 3, 7, 9; Claude ~1.5–2 days of work sessions.
 
