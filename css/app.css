@@ -171,7 +171,8 @@ button {
 .home-greeting {
   margin: 0 0 16px;
   font-size: 1.3rem;
-  color: var(--ink-soft);
+  font-weight: 700;
+  color: var(--brand);
 }
 
 .home-title.holding {
