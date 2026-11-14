@@ -97,6 +97,43 @@ describe('storage with the real localStorage adapter', () => {
     expect(store.load(() => 1)).toMatchObject({ level: 2 });
   });
 
+  it('a full but readable store still resumes the existing save', () => {
+    const ls = fakeLocalStorage();
+    ls.map.set(RESUME_KEY, JSON.stringify({ ...record, level: 7, savedAt: Date.now() }));
+    ls.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
+    vi.stubGlobal('localStorage', ls);
+    expect(createStore().load(() => 1)).toMatchObject({ level: 7 });
+  });
+
+  it('when a write fails, the old real save is removed so it cannot come back later', () => {
+    const ls = fakeLocalStorage();
+    vi.stubGlobal('localStorage', ls);
+    const store = createStore();
+    store.save({ ...record, level: 1 }); // real save
+    ls.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
+    store.save({ ...record, level: 5 }); // fails → memory
+    expect(ls.map.has(RESUME_KEY)).toBe(false);
+    expect(store.load(() => 1)).toMatchObject({ level: 5 });
+  });
+
+  it('keeps playing even if removing the old save fails too', () => {
+    const ls = fakeLocalStorage();
+    vi.stubGlobal('localStorage', ls);
+    const store = createStore();
+    ls.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
+    ls.removeItem = () => {
+      throw new Error('nope');
+    };
+    expect(() => store.save(record)).not.toThrow();
+    expect(store.load(() => 1)).toMatchObject({ level: 2 });
+  });
+
   it('switches to memory when localStorage fills up mid-game', () => {
     const ls = fakeLocalStorage();
     vi.stubGlobal('localStorage', ls);

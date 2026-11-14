@@ -125,6 +125,12 @@ test('if storage fills up mid-game, she keeps playing', async ({ page, context }
     await expect(page.locator('.celebrate')).toHaveCount(0, { timeout: 5000 });
     await expect(page.locator('.demo-choice').first()).toBeVisible();
   }
+  // Home then Continue must bring back where she is now (from memory), not the older saved puzzle.
+  const progress = await page.locator('.level-dots').textContent();
+  await page.getByRole('button', { name: 'Home' }).click();
+  await page.evaluate(() => (location.hash = '#/game/demo'));
+  await page.locator('.choice-continue').click();
+  await expect(page.locator('.level-dots')).toHaveText(progress ?? '');
 });
 
 test('unknown addresses end up on the home screen', async ({ page }) => {

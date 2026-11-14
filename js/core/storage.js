@@ -44,14 +44,12 @@ export function memoryBackend() {
   };
 }
 
-/** @returns {Backend | null} null if localStorage is missing, blocked or full. */
+/** @returns {Backend | null} null if localStorage is missing or blocked. (A full store is handled in save.) */
 function browserBackend() {
   try {
     const ls = globalThis.localStorage;
     if (!ls) return null;
-    const probe = `${PREFIX}probe`;
-    ls.setItem(probe, '1'); // throws when blocked or full
-    ls.removeItem(probe);
+    ls.getItem(RESUME_KEY); // throws when blocked; a read, so a full-but-readable store still resumes
     return {
       getItem: (k) => ls.getItem(k),
       setItem: (k, v) => ls.setItem(k, v),
@@ -87,7 +85,11 @@ export function createStore(options = {}) {
       try {
         backend.setItem(RESUME_KEY, value);
       } catch {
-        backend = memoryBackend(); // storage became full or blocked mid-game: keep playing from memory
+        // Storage is full or blocked: drop the old real save (so it can't come back later and jump her into an
+        // old puzzle), then keep playing from memory.
+        const old = backend;
+        safely(() => old.removeItem(RESUME_KEY));
+        backend = memoryBackend();
         backend.setItem(RESUME_KEY, value);
       }
     },

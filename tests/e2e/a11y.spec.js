@@ -2,9 +2,17 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, hold, startDemo, tapWrongChoice, test } from './fixtures.js';
 
-/** @param {import('@playwright/test').Page} page */
-async function violations(page) {
-  const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {{ inPage?: boolean }} [options]  inPage: scan without axe's temporary helper page (needed while the
+ *   page's clock is faked, because the fake clock is shared with every page in the context). Our app has no iframes,
+ *   so nothing is lost.
+ */
+async function violations(page, { inPage = false } = {}) {
+  const result = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .setLegacyMode(inPage)
+    .analyze();
   return result.violations.map((v) => `${v.id}: ${v.help} (${v.nodes.map((n) => n.target.join(' ')).join(', ')})`);
 }
 
@@ -26,12 +34,18 @@ test('play screen has no accessibility problems', async ({ page }) => {
 });
 
 test('celebration has no accessibility problems', async ({ page }) => {
-  await page.clock.install(); // freeze time so the celebration stays up while axe scans it
+  await page.clock.install();
   await startDemo(page);
+  await page.clock.pauseAt(Date.now() + 1000); // freeze time so the celebration stays up while axe scans it
   const target = await page.locator('.demo-target').textContent();
   await page.locator('.demo-choice', { hasText: target ?? '' }).first().click();
   await expect(page.locator('.celebrate')).toBeVisible();
-  expect(await violations(page)).toEqual([]);
+  // axe needs a few timer ticks of its own, so move the paused clock 1 ms at a time while it runs. That stays far
+  // below the celebration's 1.4 s, so the overlay can't disappear mid-scan.
+  let done = false;
+  const scan = violations(page, { inPage: true }).finally(() => (done = true));
+  for (let ms = 0; !done && ms < 1000; ms++) await page.clock.runFor(1);
+  expect(await scan).toEqual([]);
   await expect(page.locator('.celebrate')).toBeVisible(); // it really was the celebration that was checked
 });
 
