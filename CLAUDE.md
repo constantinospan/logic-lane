@@ -105,6 +105,16 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 8. **Learned rules:** when the owner says the reviewer should have caught something, add the reason as a rule (with
    the date) under "Learned rules" in `docs/REVIEW-CHECKLIST.md`, as part of the same PR.
 
+## Changing CI or the test setup (local sessions only)
+Learned the hard way (2026-11-14, PR #13):
+- **Measure before changing.** Get step timings from a real run (`gh run view <id> --json jobs`), and judge a
+  speed change across at least 3 runs: GitHub's machines vary by ±15 s per run.
+- **Prove it on GitHub, not just locally.** WebKit on GitHub's Linux machines behaves differently from a Mac (two
+  service-worker quirks so far). A CI change needs at least 3 green runs, plus a throwaway break that turns the
+  `test` check red, before hand-off.
+- **The required `test` check must never be skipped.** GitHub counts a skipped required check as passed.
+- **Keep Playwright's default number of workers in CI.** Using every core made a WebKit service-worker test flaky.
+
 ## Staging changes, and rule files on PR runs
 On runs tied to a PR (`@claude` on a PR, or a pull request event), the action replaces `CLAUDE.md` and `.claude/` in
 the working tree with `main`'s versions. The PR's own versions are kept under `.claude-pr/` for reference.
