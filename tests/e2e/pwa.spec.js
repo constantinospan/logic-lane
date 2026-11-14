@@ -63,3 +63,31 @@ test('a new version shows "New!", and tapping it updates into the same puzzle', 
   await expect.poll(() => page.evaluate(() => caches.keys())).toContain('logic-lane:test-next');
   await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('logic-lane:dev');
 });
+
+// WebKit sometimes loses the "take over" message the banner sends (3 of 150 taps on Linux WebKit, 2026-11-14), so the
+// app sends it again. This drops the first one on purpose, in every browser, and the update must still happen.
+test('the update still happens when the first "take over" message is lost', async ({ page, context, baseURL }) => {
+  await context.addInitScript(() => {
+    const send = ServiceWorker.prototype.postMessage;
+    let dropped = false;
+    ServiceWorker.prototype.postMessage = function (/** @type {any[]} */ ...args) {
+      if (args[0] === 'skipWaiting' && !dropped) {
+        dropped = true;
+        return;
+      }
+      return send.apply(this, /** @type {any} */ (args));
+    };
+  });
+  await page.goto('./');
+  await waitForControl(page);
+  await startDemo(page);
+  await context.addCookies([{ name: 'test-sw-version', value: 'test-lost', url: String(baseURL) }]);
+  await page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.update());
+
+  const banner = page.getByRole('button', { name: 'New version. Tap to update.' });
+  await expect(banner).toBeVisible({ timeout: 10_000 });
+  await banner.click();
+  await page.waitForFunction(() => document.querySelector('.update-banner') === null, null, { timeout: 10_000 });
+  await expect(page.locator('.demo-choice').first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => caches.keys())).toContain('logic-lane:test-lost');
+});
