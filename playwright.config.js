@@ -12,7 +12,9 @@ export default defineConfig({
   // purpose with --update-snapshots (docs/TESTING.md).
   updateSnapshots: process.env.CI ? 'none' : 'missing',
   expect: {
-    toHaveScreenshot: { animations: 'disabled', caret: 'hide', maxDiffPixels: 100 },
+    // Strict: CI's pictures come out byte-identical run to run, so even a slightly different shade must fail
+    // (Playwright's default per-pixel tolerance, 0.2, let a changed title colour pass).
+    toHaveScreenshot: { animations: 'disabled', caret: 'hide', maxDiffPixels: 100, threshold: 0.01 },
   },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
