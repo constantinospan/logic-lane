@@ -63,7 +63,18 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
+      # The browsers are kept between runs (keyed by the lockfile, so a Playwright upgrade gets fresh ones). The
+      # system packages and fonts are always installed fresh, so the pictures don't depend on the cache.
+      - name: Restore test browsers
+        id: browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        run: npx playwright install --with-deps chromium webkit
+      - if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
+        run: npx playwright install-deps chromium webkit
       - run: npx playwright test --shard=${{ matrix.shard }}/3
       - name: Upload test report and pictures (on failure)
         if: ${{ failure() }}
