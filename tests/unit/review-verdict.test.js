@@ -255,7 +255,10 @@ describe('fix loop (D17)', () => {
     expect(nextStep('fail', input({ fixRounds: 1 }))).toContain('round 2 of 2');
     expect(nextStep('fail', input({ fixRounds: 2 }))).toContain('used up. Over to you');
     expect(nextStep('fail', input({ fixOn: false }))).toContain('automatic fixes are off');
-    expect(nextStep('pass', input())).toContain('merge');
+    expect(nextStep('pass', input())).toContain('look at the screenshots');
+    expect(nextStep('pass', input({ play: { needed: false, job: 'skipped', json: '' } }))).toBe(
+      "Next: merge if you're happy.",
+    );
     expect(nextStep('incomplete', input())).toContain('Re-run');
   });
 });

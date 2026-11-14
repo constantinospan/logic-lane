@@ -272,7 +272,11 @@ export function buildVerdict(input) {
  * @returns {string}
  */
 export function nextStep(state, input) {
-  if (state === 'pass') return 'Next: look at the screenshots, then merge if you\'re happy.';
+  if (state === 'pass') {
+    return input.play.needed
+      ? 'Next: look at the screenshots, then merge if you\'re happy.'
+      : 'Next: merge if you\'re happy.';
+  }
   if (state === 'incomplete') {
     return 'Next: a reviewer stopped before finishing, so there\'s no verdict and no automatic fix. Re-run the ' +
       '**AI review** workflow from the Actions tab, or review it yourself.';

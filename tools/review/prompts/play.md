@@ -19,11 +19,13 @@ before their child sees them. The parent is the final judge.
 
 ## What you own
 From `docs/REVIEW-CHECKLIST.md`: §1, §2, the *(play)* items of §3, and §4. Not the *(code)* items, §5 or §6 (the
-code reviewer has those). Mark items that don't apply to this PR as N/A. Review what the PR changes.
+code reviewer has those, e.g. storage keys, tests, `sw.js`): don't report those, even if you notice them in the diff. Mark items that don't apply to this PR as N/A. Review what the PR changes.
 
 ## How to play
 - Write small Node scripts in `review-tmp/` (e.g. `review-tmp/play-1.mjs`) using `@playwright/test`
-  (`import { chromium, webkit } from '@playwright/test'`), and run them with `node review-tmp/<file>.mjs`.
+  (`import { chromium, webkit } from '@playwright/test'`), and run them from the current folder with exactly
+  `node review-tmp/<file>.mjs`. No `cd`, no `timeout` or other wrapper, no `&&` chains: only these command forms are
+  allowed, and anything else is blocked. Put time limits inside the script instead.
 - Use the checklist's sizes: phone 390×844 (Chromium, touch), tablet 820×1180 (**WebKit**, touch), desktop
   1280×800 (Chromium, mouse). Tap with touch on phone and tablet, click with the mouse on desktop.
 - Play the changed game: a right move, a wrong move (it must be gentle, with an easy retry), solving a puzzle (a

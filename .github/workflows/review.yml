@@ -197,8 +197,17 @@ jobs:
           claude_args: >-
             --max-turns 80
             --json-schema '${{ steps.schema.outputs.json }}'
-            --allowedTools "Read,Glob,Grep,Write,Bash(node review-tmp/:*),Bash(node tools/review/shots.mjs:*),Bash(node pr/tests/serve.mjs:*),Bash(git -C pr diff:*),Bash(git -C pr log:*),Bash(git -C pr show:*),Bash(ls:*)"
+            --allowedTools "Read,Glob,Grep,Write,Bash(node review-tmp/:*),Bash(node /home/runner/work/logic-lane/logic-lane/review-tmp/:*),Bash(node tools/review/shots.mjs:*),Bash(node /home/runner/work/logic-lane/logic-lane/tools/review/shots.mjs:*),Bash(node pr/tests/serve.mjs:*),Bash(node /home/runner/work/logic-lane/logic-lane/pr/tests/serve.mjs:*),Bash(git -C pr diff:*),Bash(git -C pr log:*),Bash(git -C pr show:*),Bash(ls:*)"
             --disallowedTools "Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
+      # Which tool calls the allow-list blocked (the log is otherwise quiet: show_full_output stays off).
+      - name: Blocked tool calls
+        if: ${{ always() && steps.claude.outputs.execution_file != '' }}
+        env:
+          EXEC: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          jq -r '.[] | select(.type == "result") | .permission_denials[]?
+            | "\(.tool_name): \((.tool_input.command // .tool_input.file_path // .tool_input.url // "") | tostring | .[0:200])"' \
+            "$EXEC" 2>/dev/null || echo "No execution file."
       - name: Keep the reviewer's extra screenshots
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -273,6 +282,16 @@ jobs:
             --json-schema '${{ steps.schema.outputs.json }}'
             --allowedTools "Read,Glob,Grep,Bash(git -C pr diff:*),Bash(git -C pr log:*),Bash(git -C pr show:*),Bash(git -C pr blame:*),Bash(ls:*)"
             --disallowedTools "Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
+
+      # Which tool calls the allow-list blocked (the log is otherwise quiet: show_full_output stays off).
+      - name: Blocked tool calls
+        if: ${{ always() && steps.claude.outputs.execution_file != '' }}
+        env:
+          EXEC: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          jq -r '.[] | select(.type == "result") | .permission_denials[]?
+            | "\(.tool_name): \((.tool_input.command // .tool_input.file_path // .tool_input.url // "") | tostring | .[0:200])"' \
+            "$EXEC" 2>/dev/null || echo "No execution file."
 
   verdict:
     needs: [gate, play-review, code-review]
@@ -506,7 +525,8 @@ jobs:
           if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
-      - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+      - id: claude
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
         env:
           CLAUDE_BRANCH: ${{ needs.gate.outputs.branch }}
         with:
@@ -521,6 +541,15 @@ jobs:
             --max-turns 120
             --allowedTools "Read,Glob,Grep,Write,Edit,MultiEdit,Bash(npm ci),Bash(npm run check),Bash(npm test:*),Bash(npm run typecheck),Bash(npm run test:e2e:*),Bash(npx playwright test:*),Bash(npx vitest:*),Bash(git log:*),Bash(git show:*),Bash(git status),Bash(git diff:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD:${{ needs.gate.outputs.branch }})"
             --disallowedTools "WebFetch,WebSearch"
+      # Which tool calls the allow-list blocked (the log is otherwise quiet: show_full_output stays off).
+      - name: Blocked tool calls
+        if: ${{ always() && steps.claude.outputs.execution_file != '' }}
+        env:
+          EXEC: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          jq -r '.[] | select(.type == "result") | .permission_denials[]?
+            | "\(.tool_name): \((.tool_input.command // .tool_input.file_path // .tool_input.url // "") | tostring | .[0:200])"' \
+            "$EXEC" 2>/dev/null || echo "No execution file."
       - name: Report
         if: ${{ always() && steps.head.outcome == 'success' }}
         env:
