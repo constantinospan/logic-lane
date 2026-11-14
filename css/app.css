@@ -391,6 +391,22 @@ button {
   background: var(--sun);
 }
 
+.demo-timer {
+  width: min(100%, 480px);
+  height: 16px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.demo-timer-fill {
+  --left: 1;
+  height: 100%;
+  width: calc(var(--left) * 100%);
+  background: var(--brand);
+}
+
 .demo-choices {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));

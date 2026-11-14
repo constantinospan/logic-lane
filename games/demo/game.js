@@ -1,6 +1,8 @@
 // Hidden demo game: "tap the matching picture". It exists to exercise the shared base (ladder, seeds,
 // resume, celebration, speaker) for tests and the AI reviewer. Not shown on the home screen.
 
+const COUNTDOWN_MS = 30000;
+
 /** @typedef {{ emoji: string, word: string }} Thing */
 
 /** @type {Thing[]} */
@@ -77,9 +79,33 @@ const demo = {
       grid.append(button);
     }
 
-    wrap.append(target, grid);
+    // 30-second countdown shown as a shrinking bar (owner asked for it, 2026-11-14; demo game only).
+    // At zero it just starts again with a friendly hint: nothing is lost, there is no sound. It is not saved.
+    const bar = document.createElement('div');
+    bar.className = 'demo-timer';
+    bar.setAttribute('aria-hidden', 'true');
+    const fill = document.createElement('div');
+    fill.className = 'demo-timer-fill';
+    bar.append(fill);
+
+    let startedAt = Date.now();
+    const timerId = setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed >= COUNTDOWN_MS) {
+        startedAt = Date.now();
+        api.setInstruction(`Take your time. Find the ${p.target.word}.`);
+      }
+      fill.style.setProperty('--left', String(1 - (Date.now() - startedAt) / COUNTDOWN_MS));
+    }, 100);
+
+    wrap.append(target, bar, grid);
     el.append(wrap);
-    return { destroy: () => el.replaceChildren() };
+    return {
+      destroy: () => {
+        clearInterval(timerId);
+        el.replaceChildren();
+      },
+    };
   },
 };
 
