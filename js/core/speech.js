@@ -5,9 +5,7 @@
 let voice = null;
 
 function chooseVoice() {
-  const synth = globalThis.speechSynthesis;
-  if (!synth) return;
-  const voices = synth.getVoices();
+  const voices = globalThis.speechSynthesis?.getVoices() ?? [];
   voice =
     voices.find((v) => v.lang === 'en-GB') ?? voices.find((v) => v.lang.startsWith('en')) ?? null;
 }

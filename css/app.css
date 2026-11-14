@@ -205,8 +205,13 @@ button {
   line-height: 1;
 }
 
-.tile-soon {
-  opacity: 0.55;
+.tile-soon .tile-icon {
+  filter: grayscale(1);
+  opacity: 0.5; /* fade only the picture; words stay readable (contrast) */
+}
+
+.tile-soon .tile-title {
+  color: var(--ink-soft);
 }
 
 .tile-badge {

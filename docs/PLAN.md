@@ -40,6 +40,14 @@ Notes:
 - Step 5 done: `npm run check` = `tsc` (strict `checkJs`, separate WebWorker config for `sw.js`) + Vitest + Playwright
   (phone Chromium, tablet WebKit, desktop Chromium). See `docs/TESTING.md`. Each test was proven able to fail by
   breaking the app on purpose.
+- Step 5b done: more tests. Coverage (core at 100% lines, 95% branches, gated), accessibility checks (axe) on every
+  screen, and browser edge cases (races, expiry, broken storage, no speech, endless top, rotation, reduced motion).
+  It found and fixed a low-contrast "Soon" badge, and (via review) a real bug: with storage blocked or full the game
+  couldn't be played. It now falls back to memory (D7). New tests were mutation-checked; ones that couldn't fail
+  were strengthened.
+- To do in step 6a: visual snapshot tests (Playwright `toHaveScreenshot`) of every screen at all three sizes.
+  Baselines are recorded on GitHub's Linux machines (they differ by OS), stored in the repo, and updated only
+  on purpose.
 - To do in step 6a: CI on Node 24: `npm ci`, `npx playwright install --with-deps chromium webkit`, `npm run check`.
   That job is the required status check on `main`. Upload the Playwright report on failure.
 - To do in step 6a: the deploy job writes a hash of the shipped files (`tests/shipped-files.js`, plus `sw.js`
