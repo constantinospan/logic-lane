@@ -7,7 +7,7 @@
 
 export const PREFIX = 'logic-lane:';
 export const RESUME_KEY = `${PREFIX}resume`;
-export const RESUME_WINDOW_MS = 3 * 60 * 60 * 1000;
+export const RESUME_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 /**
  * @typedef {object} ResumeRecord
