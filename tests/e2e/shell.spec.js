@@ -3,7 +3,7 @@ import { demoLayout, expect, readSave, startDemo, tapRightChoice, tapWrongChoice
 
 test('home shows the title and game tiles', async ({ page }) => {
   await page.goto('./');
-  await expect(page.locator('.home-title')).toHaveText('Logic Lan');
+  await expect(page.locator('.home-title')).toHaveText('Logic Lane');
   await expect(page.locator('.tile').first()).toBeVisible();
   await expect(page.locator('.tile', { hasText: 'Demo' })).toHaveCount(0); // hidden game
 });
