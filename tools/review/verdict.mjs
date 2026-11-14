@@ -187,7 +187,12 @@ function screenshotSection(input, play) {
   }
 
   const shown = new Set(standard.map((s) => s.file));
-  const extra = (play?.screenshots ?? []).filter((s) => safe(s.file) && !shown.has(s.file)).slice(0, 12);
+  // The reviewer may give 'review-shots/extra-x.png' instead of the bare name: only the name is used, and safe()
+  // still accepts only files that really were published.
+  const extra = (play?.screenshots ?? [])
+    .map((s) => ({ ...s, file: String(s.file ?? '').replace(/^(\.\/)?review-shots\//, '') }))
+    .filter((s) => safe(s.file) && !shown.has(s.file))
+    .slice(0, 12);
   if (extra.length) {
     out.push('', 'From the play reviewer:', '');
     for (const s of extra) out.push(`${img(s.file, s.caption)} ${clean(s.caption)}`, '');
