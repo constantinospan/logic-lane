@@ -107,6 +107,29 @@ automatic fix runs, claude.ai/code sessions and local sessions.
 8. **Learned rules:** when the owner says the reviewer should have caught something, add the reason as a rule (with
    the date) under "Learned rules" in `docs/REVIEW-CHECKLIST.md`, as part of the same PR.
 
+## Reporting results to the owner
+When a reply, comment or session message reports a result (tests, an AI review, a merge, a proof run), show it as its
+own block so it stands out from the rest of the text (owner, 2026-11-14):
+
+```
+---
+### Result · PR #28
+🟩 **Tests:** passed
+🟨 **AI review:** still running
+---
+```
+
+- One line per result: a coloured square, a bold label, then the result in plain words.
+  - 🟩 green: passed, merged, done.
+  - 🟥 red: failed.
+  - 🟨 yellow: pending, still running, waiting for the owner.
+- Markdown can't colour text, so the squares carry the colour. Inside a result block, use no other emoji, no ticks
+  or crosses, and no raw codes like `SUCCESS`. (This doesn't change anything outside result blocks, such as the
+  required PR attribution line.)
+- Several results at once: one block each. A result without a PR (a local check, a proof run) uses a short topic as
+  the heading, e.g. `### Result · Linux WebKit stress test`.
+- This is for how agents report. The AI review's own verdict comment keeps its ✅/❌ format (`docs/REVIEW-CHECKLIST.md`).
+
 ## Changing CI or the test setup (local sessions only)
 Learned the hard way (2026-11-14, PR #13):
 - **Measure before changing.** Get step timings from a real run (`gh run view <id> --json jobs`), and judge a
