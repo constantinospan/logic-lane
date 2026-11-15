@@ -16,8 +16,9 @@ either file are rule changes: they're always reviewed.
 ## The brief
 `brief` is 3–5 short lines saying what will be built, the way you'd explain it to the parent. The builder copies it
 into the PR, and the AI PR review checks the change against it. **Anything in the brief that the request doesn't say
-must also be listed as an assumption.** Hiding a guess in the brief, or calling a real unknown an assumption or a
-note, defeats the check.
+must also be listed as an assumption.** **One assumption per separate choice:** never combine unrelated
+guesses (e.g. "picture and message") into one to stay under `maxAssumptions` (6c proofs #45 and #46, 2026-11-15).
+Hiding a guess in the brief, or calling a real unknown an assumption or a note, defeats the check.
 
 ## What to check
 1. **Clear enough to build?** Which game or screen? What should she see and do? If two builders would build very

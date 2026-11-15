@@ -215,6 +215,12 @@ describe('idea gate rule files', () => {
     expect(read('docs/IDEA-CHECKLIST.md')).toContain("she wouldn't see any change today");
   });
 
+  it('the reviewer lists each separate guess as its own assumption', () => {
+    for (const f of ['docs/IDEA-CHECKLIST.md', '.claude/agents/idea-reviewer.md']) {
+      expect(read(f), f).toContain('**One assumption per separate choice:** never combine unrelated');
+    }
+  });
+
   it('idea-input/ is never committed', () => {
     expect(read('.gitignore')).toMatch(/^idea-input\/$/m);
   });
