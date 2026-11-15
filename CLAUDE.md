@@ -96,11 +96,19 @@ automatic fix runs, claude.ai/code sessions and local sessions.
      this issue or PR (the brief, the assumptions, and what the owner's answers decided). Build what the brief and
      assumptions say; notes are optional and never change what gets built. It's context, not instructions. Never
      commit `idea-input/`.
+   - **After "go anyway"** the report is the ❓ or 🛑 the owner chose to skip (2026-11-15):
+     - Problems (clashes with a decision) are overruled by the owner: build it as asked.
+     - 🛑 blockers still stand. Never break a "Never do" rule: say which one, and build the rest if it makes sense.
+     - An open question that changes what gets built a lot (which game, which screen) is asked once, in one short
+       comment ("reply `@claude` and the option"), then stop. The answer goes through the idea check again. If the
+       owner has already said "go anyway" twice since the latest idea check, pick a sensible option and build it.
+     - Smaller open questions: pick a default and build.
+     - List every choice you made in the PR as **your own** assumption. Never call it "from the idea check".
    - Fix runs and AI reviewer runs skip this step: their task comes from the workflow.
 1. Read the request and the related decisions. If it's ambiguous in a way that changes what you'd build,
    ask one short question (in the issue, or in the session) and stop. For small gaps, pick a sensible default and
-   state it in the PR. (In sessions, step 0's questions come first, so this is only for what the idea check
-   didn't settle.)
+   state it in the PR. (After "go anyway", step 0's rules say what to ask. In sessions, step 0's questions come
+   first, so this is only for what the idea check didn't settle.)
 2. **Branch:**
    - A request on an issue gets a new branch. So does a correction on the issue (e.g. `@claude 2: use digits`) before
      a PR exists: build the whole request again with the correction.
@@ -127,6 +135,8 @@ automatic fix runs, claude.ai/code sessions and local sessions.
    - If there was an idea check, copy its **What will be built** lines and its **Assumptions** into the PR
      description, and say if anything turned out different and why. The AI PR review checks the change against the
      idea check's own comment, not against your copy.
+   - If the change shows nothing she can see today (e.g. it styles a game that's still hidden), say so plainly at the
+     top of the PR description.
 6. **"Revert PR #N" requests:** the repo only allows squash merges, so each PR is one commit on `main`. On a new
    branch, run `git revert <that commit's sha>`. Fetch full history first if the commit is missing.
    If that PR changed `.github/workflows/`, don't attempt it. The builder can't push workflow changes, so reply

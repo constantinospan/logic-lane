@@ -76,6 +76,42 @@ describe('buildBrief', () => {
     expect(out).toContain('Part two?');
   });
 
+  it("the owner's replies on a linked issue count; other people's and unmarked bot comments don't", () => {
+    const out = buildBrief({
+      pr: 5,
+      prComments: [],
+      issues: [{
+        number: 4,
+        comments: [
+          idea('2026-01-01', HEADINGS.build, 'Digits or dots, dots by default.'),
+          c(OWNER, '2026-01-02', '@claude 2: use digits'),
+          c('someone', '2026-01-03', 'make it purple'),
+          c(BOT, '2026-01-04', 'Not an idea check.'),
+        ],
+      }],
+    });
+    expect(out).toContain('owner · issue #4');
+    expect(out.indexOf('Digits or dots')).toBeLessThan(out.indexOf('@claude 2: use digits'));
+    expect(out).not.toContain('make it purple');
+    expect(out).not.toContain('Not an idea check.');
+  });
+
+  it('a newer idea check comes after an older one, so it overrides it', () => {
+    const out = buildBrief({
+      pr: 5,
+      prComments: [],
+      issues: [{
+        number: 4,
+        comments: [
+          idea('2026-01-05', HEADINGS.build, 'Newer: digits.'),
+          idea('2026-01-01', HEADINGS.ask, 'Older: which style?'),
+        ],
+      }],
+    });
+    expect(out.indexOf('Older: which style?')).toBeLessThan(out.indexOf('Newer: digits.'));
+    expect(out).toContain('Later entries override earlier ones.');
+  });
+
   it('old-format idea checks are ignored', () => {
     const old = c(BOT, '2026-01-01', `${MARKER}\n## 💡 Idea check: ✅ 85/100, building it\n\nOld.`);
     expect(buildBrief({ pr: 1, prComments: [old], issues: [] })).toBe('');

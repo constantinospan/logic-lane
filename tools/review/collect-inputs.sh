@@ -28,12 +28,18 @@ collect_brief() {
   # Called in an `||` list, where `set -e` is off, so each step returns on failure itself.
   local tmp issues n
   tmp=$(mktemp -d)
+  # Only this repo's issues (tools/idea/linked-issues.jq). A failed lookup of the list loses the brief; one issue that
+  # can't be read is skipped, with its half-written files.
   issues=$(gh pr view "$PR" --repo "$REPO" --json closingIssuesReferences \
-    --jq '.closingIssuesReferences[].number') || return 1
+    | jq -r -f "$(dirname "$0")/../idea/linked-issues.jq") || return 1
   gh api "repos/${REPO}/issues/${PR}/comments" --paginate > "$tmp/pr-pages.json" || return 1
   for n in $issues; do
-    gh api "repos/${REPO}/issues/${n}/comments" --paginate > "$tmp/pages-$n.json" || return 1
-    jq -s --argjson n "$n" '{number: $n, comments: (add // [])}' "$tmp/pages-$n.json" > "$tmp/issue-$n.json" || return 1
+    if ! gh api "repos/${REPO}/issues/${n}/comments" --paginate > "$tmp/pages-$n.json" \
+      || ! jq -s --argjson n "$n" '{number: $n, comments: (add // [])}' "$tmp/pages-$n.json" > "$tmp/issue-$n.json"; then
+      echo "Brief: skipped linked issue #${n}, couldn't read it."
+      rm -f "$tmp/pages-$n.json" "$tmp/issue-$n.json"
+      continue
+    fi
   done
   jq -s 'add // []' "$tmp/pr-pages.json" > "$tmp/pr.json" || return 1
   if ls "$tmp"/issue-*.json > /dev/null 2>&1; then jq -s '.' "$tmp"/issue-*.json; else echo '[]'; fi > "$tmp/issues.json"
