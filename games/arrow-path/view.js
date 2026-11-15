@@ -332,7 +332,7 @@ export function mountView(el, p, api) {
     wrap.classList.add('ap-busy');
     const walk = board ? walkArrows(p, arrows) : runProgram(p, program);
     const { path } = walk;
-    lightUp(path[0]);
+    if (path.length > 1) lightUp(path[0]); // a trail only when the robot moves (not for an empty list)
     for (let k = 1; k < path.length; k++) {
       later(() => {
         placeRobot(path[k]);

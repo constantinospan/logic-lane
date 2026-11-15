@@ -248,6 +248,19 @@ describe('arrow-path puzzles at every level', () => {
     });
   }
 
+  it('gives the same puzzle for the same seed and level, at every kind of level (D12)', () => {
+    // A bug report with a seed must recreate that exact puzzle. Board, moves, 🔁, fix-the-list (with and without 🔁,
+    // 1 and 2 wrong arrows) and endless levels; through the game's own createPuzzle too.
+    for (const level of [1, 4, 10, 11, 14, 18, 21, 24, 26, 29, 30, 35]) {
+      for (const seed of ['abc123', 'e2etst', 'visual']) {
+        const first = generate(level, createRng(seed, level));
+        const again = generate(level, createRng(seed, level));
+        expect(again).toEqual(first);
+        expect(arrowPath.createPuzzle(level, createRng(seed, level))).toEqual(first.puzzle);
+      }
+    }
+  });
+
   it('gives different puzzles for different seeds', () => {
     for (const level of [1, 11, 14, 21, 30]) {
       const layouts = new Set();

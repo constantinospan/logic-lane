@@ -102,6 +102,11 @@ test('moves: build the list, fix a step, press Go', async ({ page }) => {
   await expect(slots).toHaveCount(/** @type {number} */ (p.slots));
   const hint = page.locator('.ap-hint');
   await expect(hint).toHaveText('');
+  // Go with an empty list: the gentle hint, but no lit square (the robot didn't move).
+  await page.getByRole('button', { name: 'Go' }).click();
+  await expect(page.locator('.ap-busy')).toHaveCount(0);
+  await expect(hint).toHaveText('Not there yet. Try again.');
+  await expect(page.locator('.ap-trail')).toHaveCount(0);
   // Too short first: "not there yet", shown and spoken, and the last step is marked.
   await enter(page, solution.slice(0, 1));
   await page.getByRole('button', { name: 'Go' }).click();
