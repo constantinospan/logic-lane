@@ -408,6 +408,7 @@ button {
 
 .ap {
   --ap-gap: 8px; /* checklist: at least 8 px between tap targets */
+  --ap-side: var(--gap); /* space between the game and the screen's edge */
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -415,20 +416,34 @@ button {
   gap: var(--gap);
 }
 
-/* Board mode: squares are tapped, so they stay ≥ 64 px on a 390 px phone (5 columns at most). */
+/* Board mode: squares are tapped, so they never go under 64 px. 5 columns fit across a 360 px phone (with narrow
+   edges, below). On a smaller screen the page scrolls a little instead of the squares shrinking. */
 .ap-mode-board {
-  --cell: min(
-    84px,
-    calc((100vw - 2 * var(--gap) - (var(--cols) - 1) * var(--ap-gap)) / var(--cols)),
-    calc((100dvh - 230px - (var(--rows) - 1) * var(--ap-gap)) / var(--rows))
+  --cell: max(
+    64px,
+    min(
+      84px,
+      calc((100vw - 2 * var(--ap-side) - (var(--cols) - 1) * var(--ap-gap)) / var(--cols)),
+      calc((100dvh - 264px - (var(--rows) - 1) * var(--ap-gap)) / var(--rows))
+    )
   );
+}
+
+/* Narrow phones: the game uses the screen's edges too, so 5 squares or 5 buttons of 64 px fit in one row. */
+@media (max-width: 389px) {
+  .ap {
+    --ap-side: 4px;
+    align-self: stretch;
+    width: auto;
+    margin-inline: calc(var(--ap-side) - var(--gap));
+  }
 }
 
 /* Move-list mode: squares aren't tapped, so they can be smaller to leave room for the moves and the buttons. */
 .ap-mode-list {
   --cell: min(
     56px,
-    calc((100vw - 2 * var(--gap) - (var(--cols) - 1) * var(--ap-gap)) / var(--cols)),
+    calc((100vw - 2 * var(--ap-side) - (var(--cols) - 1) * var(--ap-gap)) / var(--cols)),
     calc((100dvh - 470px - (var(--rows) - 1) * var(--ap-gap)) / var(--rows))
   );
 }

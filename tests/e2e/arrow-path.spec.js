@@ -175,20 +175,41 @@ test('🏠 in the middle of a winning walk goes home cleanly, without counting t
   expect(await readSave(page)).toMatchObject({ level: 4, n: 0, active: false }); // still this puzzle, for Continue
 });
 
+/**
+ * The level fits the screen with no scrolling, and every button she taps is at least 64 px.
+ * @param {import('@playwright/test').Page} page
+ * @param {number} level
+ */
+async function checkFits(page, level) {
+  const p = await open(page, level);
+  if (p.mode !== 'board') await enter(page, ['R', 'D']);
+  const size = await page.evaluate(() => {
+    const doc = /** @type {Element} */ (document.scrollingElement);
+    return { scrollH: doc.scrollHeight, h: innerHeight, scrollW: doc.scrollWidth, w: innerWidth };
+  });
+  expect(size.scrollH).toBeLessThanOrEqual(size.h);
+  expect(size.scrollW).toBeLessThanOrEqual(size.w);
+  const targets = page.locator(p.mode === 'board' ? '.ap-tap, .ap-go' : '.ap-slot, .ap-key, .ap-go');
+  for (const box of await targets.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()))) {
+    expect(box.width).toBeGreaterThanOrEqual(64);
+    expect(box.height).toBeGreaterThanOrEqual(64);
+  }
+}
+
 for (const level of [10, 20, 30]) {
   test(`level ${level} fits the screen, with big enough buttons`, async ({ page }) => {
-    const p = await open(page, level);
-    if (p.mode !== 'board') await enter(page, ['R', 'D']);
-    const size = await page.evaluate(() => {
-      const doc = /** @type {Element} */ (document.scrollingElement);
-      return { scrollH: doc.scrollHeight, h: innerHeight, scrollW: doc.scrollWidth, w: innerWidth };
-    });
-    expect(size.scrollH).toBeLessThanOrEqual(size.h);
-    expect(size.scrollW).toBeLessThanOrEqual(size.w);
-    const targets = page.locator(p.mode === 'board' ? '.ap-tap, .ap-go' : '.ap-slot, .ap-key, .ap-go');
-    for (const box of await targets.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()))) {
-      expect(box.width).toBeGreaterThanOrEqual(64);
-      expect(box.height).toBeGreaterThanOrEqual(64);
+    await checkFits(page, level);
+  });
+}
+
+// Narrower phones than the test sizes: 5 board squares of 64 px must still fit across (AI review, PR #49).
+for (const [w, h] of [[360, 740], [375, 667]]) {
+  test.describe(`on a ${w}×${h} phone`, () => {
+    test.use({ viewport: { width: w, height: h } });
+    for (const level of [10, 30]) {
+      test(`level ${level} fits, with big enough buttons`, async ({ page }) => {
+        await checkFits(page, level);
+      });
     }
   });
 }

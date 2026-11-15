@@ -19,14 +19,13 @@ function open(p, r, c, rocks) {
 /**
  * Board mode: the fewest arrows that get the robot to the gem, and the squares that route crosses.
  *
- * A 0-1 search over (square, facing): walking on costs 0, turning on a square costs 1 (an arrow). Turning isn't
- * allowed on the start square. This treats each visit to a square on its own, while a real arrow stays put and
- * turns the robot every time it passes. Still, the answer is a **lower bound** on the true number: in any walk that
- * reaches the gem, each arrow turns the robot at most once (turning on arrow X twice would put it in the same state,
- * on X facing X's way, twice, and the walk would repeat forever), so a real answer with n arrows is a route this
- * search can find with at most n turns. The generator also
- * has a planned route with exactly the level's turns that never crosses itself, so the planned arrows really work
- * (an upper bound). When the two agree, the true minimum is exactly the level's number of turns.
+ * How: a 0-1 search over (square, facing). Walking on costs 0; turning on a square costs 1 (one arrow). No turning
+ * on the start square.
+ *
+ * Why the answer is right: the search lets the robot turn freely on each visit, but a real arrow turns it the same
+ * way every time. That only makes the search's answer a **lower bound**, never too high: a working set of n arrows
+ * gives a route with at most n turns (no arrow is used twice, or the walk would repeat forever). The generator's
+ * own route, with exactly the level's turns, gives the upper bound. Both agree, so the level's number is exact.
  * @param {Puzzle} p
  * @returns {{ turns: number, route: Cell[] } | null}  null when the gem can't be reached at all.
  */
