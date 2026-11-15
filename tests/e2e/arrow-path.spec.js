@@ -83,7 +83,10 @@ test('board: a wrong walk gets a gentle hint, keeps the arrows, and survives a r
   await page.getByRole('button', { name: 'Go' }).click();
   await expect(page.locator('.ap-busy')).toHaveCount(0); // the walk ended and the robot went back
   await expect(page.locator('.celebrate')).toHaveCount(0);
-  expect(await lastSpoken(page)).toMatch(/Oops|Round and round/);
+  const hint = /** @type {string} */ (await lastSpoken(page));
+  expect(hint).toMatch(/Oops|Round and round/);
+  await expect(page.locator('.ap-hint')).toHaveText(hint); // the same words, on screen
+  await expect(page.locator('.ap-trail')).toHaveCount(0); // the trail is for move levels only
   const [r, c] = k.split(',');
   const square = page.locator(`.ap-tap[data-r="${r}"][data-c="${c}"]`);
   await expect(square).toHaveAttribute('aria-label', /arrow/);
@@ -97,14 +100,26 @@ test('moves: build the list, fix a step, press Go', async ({ page }) => {
   const solution = /** @type {Token[]} */ (p.solution);
   const slots = page.locator('.ap-slot');
   await expect(slots).toHaveCount(/** @type {number} */ (p.slots));
-  // Too short first: "not there yet", and the last step is marked.
+  const hint = page.locator('.ap-hint');
+  await expect(hint).toHaveText('');
+  // Too short first: "not there yet", shown and spoken, and the last step is marked.
   await enter(page, solution.slice(0, 1));
   await page.getByRole('button', { name: 'Go' }).click();
   await expect(page.locator('.ap-busy')).toHaveCount(0);
   expect(await lastSpoken(page)).toBe('Not there yet. Try again.');
+  await expect(hint).toHaveText('Not there yet. Try again.');
   await expect(slots.nth(0)).toHaveClass(/ap-wrong/);
-  // Add a wrong step, select it, replace it; take one away with ✖.
+  // The squares it walked over stay lit after the robot goes back to the start.
+  const walked = new Set(runProgram(p, solution.slice(0, 1)).path.map((s) => `${s.r},${s.c}`));
+  await expect(page.locator('.ap-trail')).toHaveCount(walked.size);
+  for (const k of walked) {
+    const [r, c] = k.split(',');
+    await expect(page.locator(`.ap-cell[data-r="${r}"][data-c="${c}"]`)).toHaveClass(/ap-trail/);
+  }
+  // Add a wrong step, select it, replace it; take one away with ✖. Changing the list clears the trail.
   await enter(page, solution.slice(1));
+  await expect(page.locator('.ap-trail')).toHaveCount(0);
+  await expect(hint).toHaveText('Not there yet. Try again.'); // the hint stays until it's solved
   const wrongTurn = solution[1] === 'U' ? 'D' : 'U';
   await slots.nth(1).click();
   await expect(slots.nth(1)).toHaveClass(/ap-selected/);
@@ -138,6 +153,8 @@ test('debug: the list starts almost right; fixing the wrong arrow wins', async (
   await expect(page.locator('.celebrate')).toHaveCount(0);
   const failAt = runProgram(p, start).failAt;
   await expect(page.locator('.ap-slot').nth(failAt)).toHaveClass(/ap-wrong/);
+  await expect(page.locator('.ap-hint')).toHaveText(/Try again\./);
+  await expect(page.locator('.ap-trail').first()).toBeVisible();
   const i = start.findIndex((t, j) => t !== solution[j]);
   await page.locator('.ap-slot').nth(i).click();
   await enter(page, [solution[i]]);

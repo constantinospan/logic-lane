@@ -433,6 +433,24 @@ button {
   );
 }
 
+.ap-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* What went wrong, in big simple words. Empty until a wrong walk; its height is kept so nothing jumps. */
+.ap-hint {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--ink);
+}
+
 .ap-grid {
   position: relative;
   display: grid;
@@ -472,6 +490,12 @@ button {
 
 .ap-gem {
   background: #fff3d1;
+}
+
+/* Move levels: the squares the robot has walked over. */
+.ap-cell.ap-trail {
+  background: #bfe3f2;
+  box-shadow: inset 0 0 0 3px var(--sky);
 }
 
 .ap-arrow {
@@ -524,6 +548,11 @@ button {
 .ap-bot {
   font-size: calc(var(--cell) * 0.6);
   line-height: 1;
+}
+
+/* Move levels have smaller squares, so the robot fills more of its square. */
+.ap-mode-list .ap-bot {
+  font-size: calc(var(--cell) * 0.78);
 }
 
 .ap-robot.ap-bump .ap-bot {

@@ -116,6 +116,8 @@ export function mountView(el, p, api) {
   grid.setAttribute('aria-label', 'Board');
 
   const rocks = new Set(p.rocks.map(([r, c]) => key(r, c)));
+  /** @type {Map<string, HTMLElement>} every square, by cell key, for the trail */
+  const cells = new Map();
 
   /** @param {HTMLButtonElement} button @param {number} r @param {number} c */
   const drawSquare = (button, r, c) => {
@@ -155,6 +157,7 @@ export function mountView(el, p, api) {
       }
       cell.dataset.r = String(r);
       cell.dataset.c = String(c);
+      cells.set(k, cell);
       grid.append(cell);
     }
   }
@@ -182,6 +185,21 @@ export function mountView(el, p, api) {
   };
   const home = { r: p.start[0], c: p.start[1], d: p.facing };
   placeRobot(home, true);
+
+  // What went wrong, in words she can read (the same words 🔊 says). Its space is kept while it's empty, so the board
+  // doesn't jump when a hint shows up.
+  const hintLine = make('p', 'ap-hint');
+  hintLine.setAttribute('aria-live', 'polite');
+
+  // Move levels: the squares the robot walks over light up, so she can follow its path on a small board. The trail
+  // stays after a wrong walk, to show where it went, until she presses Go again or changes the list.
+  const clearTrail = () => {
+    for (const cell of cells.values()) cell.classList.remove('ap-trail');
+  };
+  /** @param {{ r: number, c: number }} at */
+  const lightUp = (at) => {
+    if (!board) cells.get(key(at.r, at.c))?.classList.add('ap-trail');
+  };
 
   const go = make('button', 'big-button ap-go', 'Go');
   go.textContent = '▶ Go';
@@ -237,6 +255,7 @@ export function mountView(el, p, api) {
       wiggle(slots); // full
       return;
     }
+    clearTrail();
     drawSlots();
     save();
   };
@@ -285,6 +304,7 @@ export function mountView(el, p, api) {
       if (busy || program.length === 0) return;
       program.splice(selected >= 0 && selected < program.length ? selected : program.length - 1, 1);
       selected = -1;
+      clearTrail();
       drawSlots();
       save();
     });
@@ -300,6 +320,7 @@ export function mountView(el, p, api) {
   const reset = () => {
     for (const b of slotButtons) b.classList.remove('ap-running', 'ap-wrong', 'wiggle');
     robot.classList.remove('ap-bump', 'ap-happy');
+    clearTrail();
   };
 
   go.addEventListener('click', () => {
@@ -311,9 +332,11 @@ export function mountView(el, p, api) {
     wrap.classList.add('ap-busy');
     const walk = board ? walkArrows(p, arrows) : runProgram(p, program);
     const { path } = walk;
+    lightUp(path[0]);
     for (let k = 1; k < path.length; k++) {
       later(() => {
         placeRobot(path[k]);
+        lightUp(path[k]);
         slotButtons.forEach((b, i) => b.classList.toggle('ap-running', i === path[k].i));
       }, (k - 1) * stepMs);
     }
@@ -333,6 +356,7 @@ export function mountView(el, p, api) {
       }
       robot.classList.add('ap-bump');
       api.setInstruction(hint);
+      hintLine.textContent = hint;
     }, end);
     later(() => {
       placeRobot(home, true);
@@ -342,7 +366,9 @@ export function mountView(el, p, api) {
     }, end + 900);
   });
 
-  wrap.append(grid, ...controls);
+  const stage = make('div', 'ap-stage'); // the hint above the board, kept together in the side-by-side layout
+  stage.append(hintLine, grid);
+  wrap.append(stage, ...controls);
   el.append(wrap);
 
   return {

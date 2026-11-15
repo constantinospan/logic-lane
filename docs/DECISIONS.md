@@ -335,7 +335,13 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 - **Taps mean one thing at every level:** an arrow button adds a move at the end, or replaces the selected slot.
   Tapping a slot selects it. ✖ takes away the selected move, or the last one.
 - **Pictures:** a robot 🤖 and a gem 💎, rocks 🪨. Emoji only, arrows drawn as SVG.
-- **Mistakes:** the robot wiggles where it stopped and goes back to the start. Her arrows or moves stay. 🔊 says a short
-  hint ("Oops! Try again."). No stuck help, no glow, no hint button (owner chose "No help").
+- **Mistakes:** the robot wiggles where it stopped and goes back to the start. Her arrows or moves stay. A short hint
+  says what happened: "Oops, a rock! Try again.", "Oops! Try again." (off the edge), "Round and round! Try again."
+  (board arrows that loop) or "Not there yet. Try again." (the list ran out). 🔊 reads it, and it also shows as big
+  text just above the board (owner, 2026-11-15, after the AI play review). The hint stays until the puzzle is solved.
+  No stuck help, no glow, no hint button (owner chose "No help").
+- **Trail on move levels (11–30):** the board is small there so the list and buttons fit a phone (about 56 px
+  squares). So the squares the robot walks over light up, and the robot is drawn bigger (owner chose this over a
+  bigger board, 2026-11-15). The trail stays after a wrong walk, until she presses Go again or changes the list.
 - **Generator:** the route comes first, then the puzzle around it, checked by solvers. If 500 tries all fail (never
   seen in tests), a fixed simple puzzle is used, so endless play never breaks.

@@ -85,6 +85,15 @@ for (const [name, level] of /** @type {[string, number][]} */ ([['board', 4], ['
   });
 }
 
+test('arrow path after a wrong walk', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' }); // short steps, and no wiggle mid-picture
+  await openPuzzle(page, 21, ARROW_PATH); // the list starts wrong, so Go fails straight away
+  await page.getByRole('button', { name: 'Go' }).click();
+  await expect(page.locator('.ap-busy')).toHaveCount(0);
+  await expect(page.locator('.ap-hint')).not.toHaveText('');
+  await snap(page, 'arrow-path-mistake'); // the hint line, the lit trail and the marked step
+});
+
 test('celebration', async ({ page }) => {
   await page.clock.install();
   await openPuzzle(page);
