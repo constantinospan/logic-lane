@@ -7,8 +7,8 @@
 #
 # Idea gate (D21): before the builder, every request goes to the idea reviewer, unless the gate is off or the request
 # is one of the fixed skip phrases (tools/idea/route.mjs). route → idea-review (AI, read-only, no shell) →
-# idea-verdict (script: score, comment) → builder only on a pass. All three check out main, so a PR can't change its
-# own reviewer, checklist or pass mark.
+# idea-verdict (script: fixed rules, comment) → builder only when the check says build. All three check out main, so a
+# PR can't change its own reviewer, checklist or settings.
 name: Claude builder
 
 on:
@@ -106,7 +106,7 @@ jobs:
             --allowedTools "Read,Glob,Grep"
             --disallowedTools "Bash,Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
 
-  # No AI. Scores the findings with main's settings, posts the comment, outputs go=true on a pass. Runs even when the
+  # No AI. Applies the fixed rules with main's settings, posts the comment, outputs go=true to build. Runs even when the
   # reviewer failed, so a crash is reported (⚠️) instead of going quiet.
   idea-verdict:
     needs: [route, idea-review]
@@ -118,7 +118,7 @@ jobs:
       issues: write
       pull-requests: write
     outputs:
-      go: ${{ steps.score.outputs.go }}
+      go: ${{ steps.decide.outputs.go }}
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
@@ -131,8 +131,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - name: Score
-        id: score
+      - name: Decide
+        id: decide
         env:
           REVIEW_JSON: ${{ needs.idea-review.outputs.result }}
           REVIEW_JOB: ${{ needs.idea-review.result }}
@@ -140,12 +140,12 @@ jobs:
         run: |
           set -o pipefail
           printf '%s' "$REVIEW_JSON" > "${RUNNER_TEMP}/review.json"
-          node tools/idea/score.mjs "${RUNNER_TEMP}/review.json" --job "$REVIEW_JOB" --out "${RUNNER_TEMP}/idea" \
+          node tools/idea/decide.mjs "${RUNNER_TEMP}/review.json" --job "$REVIEW_JOB" --out "${RUNNER_TEMP}/idea" \
             --run-url "$RUN_URL" | tee -a "$GITHUB_OUTPUT"
       # gh api works for issues and PRs alike. The gate only ever adds needs-you: on a PR it may be the AI review's.
       - name: Post the idea check
         env:
-          GO: ${{ steps.score.outputs.go }}
+          GO: ${{ steps.decide.outputs.go }}
         run: |
           set -euo pipefail
           gh api "repos/${REPO}/issues/${NUMBER}/comments" -F "body=@${RUNNER_TEMP}/idea/comment.md" > /dev/null

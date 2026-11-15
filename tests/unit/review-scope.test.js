@@ -50,7 +50,7 @@ describe('docs-only', () => {
 });
 
 // D21: the idea gate's scripts steer agents, so changes to them get the rules banner.
-it.each(['tools/idea/score.mjs', 'tools/idea/route.mjs', 'tools/idea/settings.json', 'docs/IDEA-CHECKLIST.md'])(
+it.each(['tools/idea/decide.mjs', 'tools/idea/route.mjs', 'tools/idea/settings.json', 'docs/IDEA-CHECKLIST.md'])(
   '%s gets the rules banner',
   (f) => expect(isSteering(f)).toBe(true),
 );

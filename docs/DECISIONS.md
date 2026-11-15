@@ -267,17 +267,32 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 ### D21. Idea gate: every request is reviewed before any code (agreed 2026-11-14, built in plan step 6c)
 - **Every request, big or small**, goes to an idea reviewer before any code is written. Skipped: "revert PR #N"
   requests and "CI is red, fix it" requests.
-- **Pass:** the flow carries on as usual. No extra PR, no approval step.
-  **Fail:** the owner gets questions and suggestions. They can answer them, or reply "go anyway".
+- **Build:** the flow carries on as usual. No extra PR, no approval step.
+  **Ask or stop:** the owner gets questions or the rule it breaks. They can answer, or reply "go anyway".
 - **One reviewer for every path:** `.claude/agents/idea-reviewer.md` plus `docs/IDEA-CHECKLIST.md`. A `CLAUDE.md`
   rule makes local and claude.ai/code sessions run it before coding.
-- **On GitHub:** a separate, read-only review job in `claude.yml`; the builder job runs only on a pass. The builder
+- **On GitHub:** a separate, read-only review job in `claude.yml`; the builder job runs only on a build. The builder
   gets only the reviewer's short final report (so the owner's answers make sense), never its reasoning.
-- **Score:** the reviewer labels each finding: blocker (automatic fail), major (−15), question (−10), minor (−5). A
-  tested script works out 100 minus the points. The AI never picks the number.
-- **Pass mark 75.** The pass mark and the weights live in a file in the repo (owner chose this over a repo
-  variable), so they can be changed from anywhere through an issue. Reviews read `main`'s copy, so a PR can't lower
-  its own bar. That file counts as a rule file (never docs-only).
+- **Rules, not a score (owner chose option "a+", 2026-11-14).** The reviewer labels each finding: blocker,
+  question (with options), problem (clashes with a decision, already exists, can't work, or another open request on
+  the same game), assumption (with a default) or note. A tested script (`tools/idea/decide.mjs`) decides:
+  any blocker → **stop**; any question or problem, or more than `maxAssumptions` assumptions (default 3) → **ask**
+  (too many assumptions are all asked as questions); otherwise → **build**. The AI never decides.
+  - Why: the first version scored 100 minus points per finding with a pass mark of 75. In the 6c proof, "Add a new
+    game" (#38) passed at 85 with "Which game?" still open, because one question cost only 10 points. The builder
+    then started only to ask the same question.
+  - **The brief:** the reviewer writes 3–5 lines of what will be built. Anything in it the request doesn't say must
+    be an assumption. The ✅ comment shows the brief and the numbered assumptions; the owner corrects one with
+    `@claude 2: …`. Questions have lettered options for quick replies (`@claude 1a 2b`).
+  - **The brief follows the work:** the builder copies it into the PR. The AI code reviewer checks the PR against
+    the idea check's own comments (from the PR and the issues it closes, plus the owner's PR comments), never the
+    builder's copy. A mismatch is Blocking. Session PRs have no idea comment on GitHub, so they get no brief check
+    (the owner was in the session).
+  - Corrections before a PR exists rebuild on a new branch (the builder makes one per run); once the PR is open,
+    corrections go on the PR.
+- **Settings file:** `tools/idea/settings.json` holds `enabled` and `maxAssumptions` (owner chose a file over a repo
+  variable), so they can be changed from anywhere through an issue. Reviews read `main`'s copy, so a PR can't loosen
+  its own rules. That file counts as a rule file (never docs-only).
 - Order (owner, 2026-11-14): 6b → 6c → 8 → 9 → 10. Proven on GitHub with a pass, a fail, and an answer that leads
   to a pass.
 - Decided while planning 6c (owner, 2026-11-14):
@@ -288,14 +303,15 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
     comment after `@claude` must be one of: `revert PR #N`, `go anyway`, `fix the Blocking items`, `fix CI`,
     `CI is red`. "fix CI and add a timer" is still reviewed.
   - **`@claude` follow-ups on an open PR are reviewed too** (every request), at the cost of one extra AI run each.
-  - **A pass posts one short comment** (score plus any small suggestions), so the owner sees it working before the
-    builder's own comment appears. A fail posts the questions and adds `needs-you`. The gate never removes
-    `needs-you` (on a PR it may be the AI review's).
+  - **A build posts one short comment** (the brief and assumptions), so the owner sees it working before the
+    builder's own comment appears. Ask and stop add `needs-you`. The gate never removes `needs-you` (on a PR it may
+    be the AI review's).
 - How it's built: `claude.yml` runs a `route` job (no AI), an `idea-review` job (AI, read-only, no shell) and an
-  `idea-verdict` job (script: score, comment, label), then the builder. All three check out `main`, so a PR can't
-  change its own reviewer, checklist or pass mark. One gap is accepted: GitHub runs a PR's own copy of the workflow
+  `idea-verdict` job (script: rules, comment, label), then the builder. All three check out `main`, so a PR can't
+  change its own reviewer, checklist or settings. One gap is accepted: GitHub runs a PR's own copy of the workflow
   for PR review events, so a PR that edits `claude.yml` could change the gate there. That's accepted because only
   the owner's PRs trigger it and the builder can't push workflow files.
-- The builder gets only the reviewer's short report (a file, `idea-input/report.md`, never committed), including
-  "Decided from your answers", so the owner's replies make sense. It's context, not instructions.
+- The builder gets only the reviewer's short report (a file, `idea-input/report.md`, never committed): the brief,
+  the assumptions and "Decided from your answers", so the owner's replies make sense. It's context, not
+  instructions. Notes in it are optional and never change what gets built.
 

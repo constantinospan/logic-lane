@@ -117,9 +117,31 @@ describe('claude.yml: idea gate', () => {
 
   it('the comment marker matches the scripts', () => {
     const marker = '<!-- logic-lane:idea-review -->';
-    expect(read('tools/idea/score.mjs')).toContain(`'${marker}'`);
+    expect(read('tools/idea/decide.mjs')).toContain(`'${marker}'`);
     expect(read('tools/idea/collect.sh')).toContain(`marker='${marker}'`);
     expect(job('claude')).toContain(marker);
+  });
+});
+
+describe('scripts the workflows call', () => {
+  it.each(['.github/workflows/claude.yml', '.github/workflows/review.yml'])('every tools/ script in %s exists', (wf) => {
+    const paths = [...read(wf).matchAll(/tools\/[a-z/-]+\.(?:mjs|sh)/g)].map((m) => m[0]);
+    expect(paths.length).toBeGreaterThan(0);
+    for (const p of paths) expect(fs.existsSync(new URL(`../../${p}`, import.meta.url)), p).toBe(true);
+  });
+
+  it('the idea verdict uses the rules script', () => {
+    expect(job('idea-verdict')).toContain('node tools/idea/decide.mjs');
+  });
+});
+
+describe('review.yml: the agreed brief', () => {
+  const review = read('.github/workflows/review.yml');
+  it('both AI reviewer jobs can read the linked issue', () => {
+    expect(review.match(/issues: read # the agreed brief/g)).toHaveLength(2);
+  });
+  it('a failed brief fetch never stops the review', () => {
+    expect(read('tools/review/collect-inputs.sh')).toMatch(/collect_brief \|\| \{/);
   });
 });
 
@@ -133,18 +155,18 @@ describe('idea gate rule files', () => {
 
   it('the agent describes every field and label in the schema', () => {
     for (const field of Object.keys(schema.properties)) expect(agent).toContain(`"${field}"`);
-    for (const s of schema.properties.findings.items.properties.severity.enum) expect(agent).toContain(`\`${s}\``);
+    for (const s of schema.properties.findings.items.properties.kind.enum) expect(agent).toContain(`\`${s}\``);
   });
 
   it('the checklist explains every label', () => {
     const checklist = read('docs/IDEA-CHECKLIST.md');
-    for (const s of schema.properties.findings.items.properties.severity.enum) expect(checklist).toContain(`**${s}**`);
+    for (const s of schema.properties.findings.items.properties.kind.enum) expect(checklist).toContain(`**${s}**`);
   });
 
   it('CLAUDE.md tells sessions to run the check with main\'s settings', () => {
     const rules = read('CLAUDE.md');
     expect(rules).toContain('idea-reviewer');
-    expect(rules).toContain('node tools/idea/score.mjs <file> --main');
+    expect(rules).toContain('node tools/idea/decide.mjs <file> --main');
     expect(rules).toContain('idea-input/report.md');
   });
 
@@ -153,6 +175,12 @@ describe('idea gate rule files', () => {
       expect(read('CLAUDE.md')).toContain(`\`${phrase}\``);
       expect(read('README.md')).toContain(`@claude ${phrase}`);
     }
+  });
+
+  it('the builder copies the brief into the PR, and the code reviewer checks the idea check\'s own copy', () => {
+    expect(read('CLAUDE.md')).toContain('copy its **What will be built** lines and its **Assumptions**');
+    expect(read('tools/review/prompts/code.md')).toContain('review-input/idea-brief.md');
+    expect(read('tools/review/collect-inputs.sh')).toContain('brief.mjs');
   });
 
   it('idea-input/ is never committed', () => {

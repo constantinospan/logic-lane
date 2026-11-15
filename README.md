@@ -26,18 +26,25 @@ Use whichever is handy. All three end in a pull request (PR) for you to merge.
 
 What happens next:
 0. **Idea check** (when it's switched on): before anything is built, an AI reviewer checks the request as an idea
-   against the rules and decisions (`docs/IDEA-CHECKLIST.md`). A script gives it a score out of 100.
-   - **Pass** (75 or more, nothing against the rules): a short ✅ comment, then building starts as usual.
-   - **Fail:** a ❌ comment with numbered questions and the `needs-you` label. Reply `@claude` with your answers
-     (numbers are fine) and it checks again, or reply `@claude go anyway` to build it as you asked. Remove the
-     label yourself when you're done.
+   against the rules and decisions (`docs/IDEA-CHECKLIST.md`). Fixed rules (a script, not the AI) decide:
+   - **✅ building it:** the comment says **what will be built** in a few lines, plus any **assumptions** (small
+     guesses, at most 3). Building starts straight away. To change an assumption, reply `@claude 2: use digits`.
+     Before the PR exists that rebuilds on a new branch (use the newest **Create PR** link); once the PR is open,
+     comment on the PR instead.
+   - **❓ questions first:** numbered questions with lettered options, and the `needs-you` label. Reply like
+     `@claude 1a 2b` or `@claude 1b: your own words` and it checks again. Or reply `@claude go anyway`. Remove the
+     label yourself when you're done. A request that needs more than 3 guesses gets all of them as questions.
+   - **🛑 can't build this as asked:** it would break a rule (privacy, safety, outside links…). Change the request,
+     or `@claude go anyway` (the builder still keeps every rule).
    - ⚠️ means the check didn't finish: ask again, or `@claude go anyway`.
    - These skip the check, but only when they're the whole comment: `@claude revert PR #N`, `@claude go anyway`,
      `@claude fix the Blocking items`, `@claude fix CI`, `@claude CI is red`.
+   - The AI PR review later checks the PR against what the idea check agreed (and anything you changed in PR
+     comments).
    - Sessions (claude.ai/code or local) run the same check and ask you the questions there.
-   - The on/off switch (`enabled`), the pass mark and the points per finding are in `tools/idea/settings.json`. To
-     change them, ask for it like any other change (for example, an issue saying `@claude set the idea pass mark to
-     70`). The new value counts from when that PR is merged.
+   - The on/off switch (`enabled`) and the most guesses allowed (`maxAssumptions`, 0 means always ask) are in
+     `tools/idea/settings.json`. To change them, ask for it like any other change. The new value counts from when
+     that PR is merged.
 1. Claude builds it on a branch and runs the tests (about 2–5 minutes). On GitHub it posts a **Create PR** link:
    tap it, then **Create pull request**. To watch it work, open the repo's **Actions** tab.
    - On a phone, if the **Create pull request** button doesn't show: in Safari tap **aA** → **Request Desktop

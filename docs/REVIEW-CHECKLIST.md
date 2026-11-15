@@ -90,6 +90,10 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 - [ ] New or changed logic has tests, and all checks pass.
 - [ ] Changed visual snapshot pictures (`tests/e2e/visual.spec.js-snapshots/`) match a visual change the request
       asked for, and the PR lists them with the reason. Unexplained picture changes are Blocking.
+- [ ] *(code)* If `review-input/idea-brief.md` exists (D21), the change matches the agreed brief and assumptions,
+      as changed by later entries and the owner's PR comments. Something built that wasn't agreed, or agreed and
+      missing, is Blocking (with the brief line and the file). No brief file (reverts, fixes, session PRs, the gate
+      off): skip this item.
 
 ## 6. Rule changes (PRs that change `CLAUDE.md`, this checklist, `docs/DECISIONS.md`, `.claude/`, or the idea gate's `docs/IDEA-CHECKLIST.md` and `tools/idea/settings.json`)
 - [ ] Blocking if the idea gate's settings (`tools/idea/settings.json`) change and the PR description doesn't say
