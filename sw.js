@@ -29,6 +29,12 @@ const PRECACHE = [
   './js/ui/play.js',
   './js/ui/reset.js',
   './js/ui/topbar.js',
+  './games/arrow-path/engine.js',
+  './games/arrow-path/game.js',
+  './games/arrow-path/generate.js',
+  './games/arrow-path/levels.js',
+  './games/arrow-path/solve.js',
+  './games/arrow-path/view.js',
   './games/demo/game.js',
 ];
 

@@ -2,6 +2,7 @@
 
 import { assertValidLadder } from './ladder.js';
 import demo from '../../games/demo/game.js';
+import arrowPath from '../../games/arrow-path/game.js';
 
 /**
  * What a game gets from the shell while a puzzle is on screen.
@@ -35,10 +36,10 @@ import demo from '../../games/demo/game.js';
  * Games that aren't built yet, shown on the home screen as "Soon".
  * @type {{ id: string, title: string, icon: string }[]}
  */
-export const COMING_SOON = [{ id: 'arrow-path', title: 'Arrow Path', icon: '🧭' }];
+export const COMING_SOON = [];
 
 /** @type {Game[]} */
-export const GAMES = [demo];
+export const GAMES = [arrowPath, demo];
 
 for (const game of GAMES) assertValidLadder(game.ladder);
 
