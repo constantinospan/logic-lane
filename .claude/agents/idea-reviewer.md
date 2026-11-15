@@ -48,7 +48,8 @@ Only JSON, matching `tools/idea/schema.json`:
 
 - `kind` is one of `blocker`, `question`, `problem`, `assumption`, `note` (meanings in the checklist).
 - A `question` comes with 2 to 4 short `options`. An `assumption` comes with a `default`.
-- **Never hide a guess.** Anything in `brief` that the request doesn't say must also be an `assumption`. If two
+- **Never hide a guess.** Anything in `brief` that the request doesn't say must also be an `assumption`.
+  **One assumption per separate choice:** never combine unrelated guesses (e.g. "picture and message") into one. If two
   reasonable builders would build clearly different things, it's a `question`, not an assumption.
 - Plain English, short sentences. The owner reads it on a phone.
 - One finding per real issue. Don't pad, and don't split one issue into several. A clear request that fits the
