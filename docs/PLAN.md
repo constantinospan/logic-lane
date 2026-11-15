@@ -14,7 +14,7 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 7 ✅ | Dry run | You open a small test issue from your phone, watch it go to PR → merge → live | Both | 30 min | 30 min |
 | 6b ✅ | AI reviewers | Play reviewer (browser, screenshots) and code reviewer (diff), one verdict, auto-fix loop (max 2) (D19). Added on top of the working loop; expect a few iterations | Claude | 10 min | 1.5–2 h |
 | 6c ✅ | Idea gate (D21) | Every request is reviewed by an idea reviewer before any code is written, on GitHub and in sessions. Clear requests are built as usual (with a short brief); unclear ones get questions first. Fixed rules in a tested script, settings in a repo file | Claude | 10 min | 1.5–2 h |
-| 8 | Arrow path v1 | Puzzle generator + solver, ~30-level ladder, Easy/Medium/Hard starts, loops later in the ladder | Claude | — | 3–5 h |
+| 8 ✅ | Arrow path v1 | Puzzle generator + solver, ~30-level ladder, Easy/Medium/Hard starts, loops later in the ladder | Claude | — | 3–5 h |
 | 9 | Playtest | Install on the tablet, play with her, turn feedback into issues | Me | 20 min + play | — |
 | 10 | Test scaling (D20) | **When `main`'s CI passes 2m30s or at the third game:** PRs run only what they could break, shards grow with the tests, a no-cross-game-imports test | Claude | — | 1–2 h |
 
@@ -106,9 +106,13 @@ Notes:
 - Step 6c proven (2026-11-15, issues #45–#47): four guesses were all asked as questions and the builder didn't start
   (#47). #45 and #46 didn't hit the cap: the reviewer bundled guesses (e.g. "picture and message") to land on exactly
   3, so a rule now says one assumption per separate choice. #46 also showed the new nothing-to-see rule working.
-- Step 8 built (2026-11-15), in review: Arrow Path (D22). Idea check: build, after answer 1c. Owner chose one-arrow
+- Step 8 done (2026-11-15, PR #49): Arrow Path (D22). Idea check: build, after answer 1c. Owner chose one-arrow
   loops, tap-to-turn board arrows, robot and gem, no stuck help. Plan reviewed by a fresh agent first (fixed: loop
-  input, one meaning per tap, fast loop/debug checks, move-list screens fitting the phone). Tick after merge.
+  input, one meaning per tap, fast loop/debug checks, move-list screens fitting the phone). Follow-ups from the AI
+  review, in the same PR: the hint shows on screen above the board, move levels light the robot's trail and draw it
+  bigger, and tapped squares stay 64 px on 360–375 px phones (tested at those sizes). Then a polish PR: no lit
+  square on an empty Go, and a same-seed test in the game's own tests. CI on `main` after the merge: 2m28s, so
+  step 10 is due.
 - Fixed (2026-11-14): the WebKit "New!" update test failed twice in CI. Reproduced in Linux WebKit (Playwright's
   Docker image): 3 of 150 taps on "New!" did nothing, because WebKit lost the "take over" message. The app now
   sends it again every second until the new version takes over (`js/pwa/update.js`). Proven: 300 of 300 passed after
