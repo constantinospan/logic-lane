@@ -97,6 +97,12 @@ Notes:
   rules plus assumptions instead of a score (D21, option a+). The proof resumes after that change merges: ask →
   `@claude 1a` → build, too many assumptions → ask, `go anyway`, `@claude` on an open PR, a PR that sets
   `maxAssumptions: 10` still judged by `main`'s 3, and the brief check on the first real PR.
+- Step 6c proof, second round (2026-11-15, after PR #39): ask → `@claude 1a` → build (#40); `go anyway` skipped the
+  check (#41); a PR setting `enabled: false` and `maxAssumptions: 10` was still checked with `main`'s settings, and
+  `@claude` on an open PR was checked (#42); the AI review blocked PR #43 for not matching #40's brief. Fixed after:
+  the builder guessed a whole game after `go anyway` (#41), #40's change showed nothing (the only game is hidden),
+  and linked issues from other repos (PR #39 review). Still to prove on GitHub: too many assumptions → ask. Tick 6c
+  after that.
 - Fixed (2026-11-14): the WebKit "New!" update test failed twice in CI. Reproduced in Linux WebKit (Playwright's
   Docker image): 3 of 150 taps on "New!" did nothing, because WebKit lost the "take over" message. The app now
   sends it again every second until the new version takes over (`js/pwa/update.js`). Proven: 300 of 300 passed after

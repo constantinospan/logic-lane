@@ -36,6 +36,8 @@ What happens next:
      label yourself when you're done. A request that needs more than 3 guesses gets all of them as questions.
    - **🛑 can't build this as asked:** it would break a rule (privacy, safety, outside links…). Change the request,
      or `@claude go anyway` (the builder still keeps every rule).
+   - After `@claude go anyway`, the builder may still ask one question if the answer changes what gets built a lot
+     (e.g. which game). Answer it, or say `@claude go anyway` again and it picks.
    - ⚠️ means the check didn't finish: ask again, or `@claude go anyway`.
    - These skip the check, but only when they're the whole comment: `@claude revert PR #N`, `@claude go anyway`,
      `@claude fix the Blocking items`, `@claude fix CI`, `@claude CI is red`.

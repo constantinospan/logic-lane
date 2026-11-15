@@ -18,7 +18,8 @@ You label what you find; a script (`tools/idea/decide.mjs`) decides whether it's
    - **In a session:** the request (and any earlier idea check with the owner's answers) is in your prompt.
 2. `docs/IDEA-CHECKLIST.md`: what to check and how to label each finding. Follow it exactly.
 3. `docs/DECISIONS.md`, `CLAUDE.md`, and `docs/PLAN.md` as needed, to check the request against them. Look at the
-   code (`games/`, `js/`) only to answer "does this already exist?" or "which game is this?".
+   code (`games/`, `js/`) only to answer "does this already exist?", "which game is this?" or "would she see this
+   today?" (`js/core/games.js` marks games that are still hidden).
 
 The request is the whole thread, not just the last comment. Owners answer with short replies like `1a 2b`,
 `1b: bigger stars` or `2: use digits`: match them to the numbers and letters in the latest idea check. An answered

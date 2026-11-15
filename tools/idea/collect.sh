@@ -30,16 +30,24 @@ gh api "repos/${REPO}/issues/${NUMBER}/comments" --paginate --jq \
 if [ "$KIND" = pr ]; then
   gh pr view "$NUMBER" --repo "$REPO" --json files --jq '.files[].path' > "$out/pr-files.txt"
   # The issues this PR closes: their idea checks and the owner's comments there hold the original brief.
+  # Read the list first: a failure inside `for n in $(...)` would be ignored and look like "no linked issues".
   echo '[]' > "$out/linked-issues.json"
-  for n in $(gh pr view "$NUMBER" --repo "$REPO" --json closingIssuesReferences --jq '.closingIssuesReferences[].number'); do
-    gh api "repos/${REPO}/issues/${n}/comments" --paginate --jq \
+  linked=$(gh pr view "$NUMBER" --repo "$REPO" --json closingIssuesReferences \
+    | jq -r -f "$(dirname "$0")/linked-issues.jq")
+  for n in $linked; do
+    # One issue that can't be read is skipped (with its half-written files), not a failed run.
+    if ! gh api "repos/${REPO}/issues/${n}/comments" --paginate --jq \
       "[.[] | select(.user.login == \"${owner}\" or (.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))))
          | {issue: ${n}, created_at, from: (if .user.login == \"${owner}\" then \"owner\" else \"idea-check\" end), body}]" \
-      > "$out/linked-comments.json"
-    # The issue's own text too, but only if the owner wrote it (a PR could close anyone's issue).
-    gh api "repos/${REPO}/issues/${n}" --jq \
+      > "$out/linked-comments.json" \
+      || ! gh api "repos/${REPO}/issues/${n}" --jq \
       "[select(.user.login == \"${owner}\") | {issue: ${n}, created_at, from: \"owner\", body: (\"# \" + .title + \"\\n\\n\" + (.body // \"\"))}]" \
-      > "$out/linked-start.json"
+      > "$out/linked-start.json"; then
+      echo "Skipped linked issue #${n}: couldn't read it."
+      rm -f "$out/linked-start.json" "$out/linked-comments.json"
+      continue
+    fi
+    # (The second call above is the issue's own text, kept only if the owner wrote it: a PR could close anyone's issue.)
     jq -s 'add // []' "$out/linked-issues.json" "$out/linked-start.json" "$out/linked-comments.json" > "$out/linked-next.json"
     rm -f "$out/linked-start.json" "$out/linked-comments.json"
     mv "$out/linked-next.json" "$out/linked-issues.json"

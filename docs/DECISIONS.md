@@ -269,6 +269,12 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   requests and "CI is red, fix it" requests.
 - **Build:** the flow carries on as usual. No extra PR, no approval step.
   **Ask or stop:** the owner gets questions or the rule it breaks. They can answer, or reply "go anyway".
+- **"Go anyway" (2026-11-15, after proof #41, where the builder guessed a whole game):** the owner overrules the
+  problems, never the "Never do" rules. An open question that changes what gets built a lot (which game, which
+  screen) is still asked once by the builder; a second "go anyway" means the builder picks. Smaller gaps get a
+  default. The builder lists its own choices in the PR as its own, never as the idea check's.
+- **Nothing to see (2026-11-15, after proof #40, which styled only a hidden game's tile):** a request that would
+  change nothing she can see today is a problem, unless it says it's prep work on purpose.
 - **One reviewer for every path:** `.claude/agents/idea-reviewer.md` plus `docs/IDEA-CHECKLIST.md`. A `CLAUDE.md`
   rule makes local and claude.ai/code sessions run it before coding.
 - **On GitHub:** a separate, read-only review job in `claude.yml`; the builder job runs only on a build. The builder

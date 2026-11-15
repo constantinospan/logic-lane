@@ -1,6 +1,7 @@
 // The agreed brief for a PR (D21): what the idea check said would be built, plus what the owner changed since, so the
 // code reviewer can check the PR against it. Taken only from the idea check's own comments (posted by the workflow)
-// and the owner's comments, never from the PR description the builder wrote. Used by tools/review/collect-inputs.sh.
+// and the owner's comments (on the PR and on the issues it closes), never from the PR description the builder wrote.
+// Used by tools/review/collect-inputs.sh.
 //
 // Usage: node tools/review/brief.mjs <threads.json>
 //   threads.json: {"pr": <number>, "prComments": [...], "issues": [{"number": <n>, "comments": [...]}]}
@@ -41,7 +42,10 @@ export function buildBrief(threads) {
   const entries = [];
   for (const issue of threads.issues ?? []) {
     for (const c of issue.comments ?? []) {
-      if (isIdeaCheck(c)) entries.push({ at: String(c.created_at), where: `issue #${issue.number}`, who: 'idea check', body: String(c.body) });
+      const where = `issue #${issue.number}`;
+      if (isIdeaCheck(c)) entries.push({ at: String(c.created_at), where, who: 'idea check', body: String(c.body) });
+      // The owner's own replies there (e.g. `@claude 2: use digits`) can change the brief too.
+      else if (c.user?.login === OWNER) entries.push({ at: String(c.created_at), where, who: 'owner', body: String(c.body) });
     }
   }
   for (const c of threads.prComments ?? []) {

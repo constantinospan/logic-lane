@@ -145,6 +145,28 @@ describe('review.yml: the agreed brief', () => {
   });
 });
 
+describe('linked issues (the issues a PR closes)', () => {
+  const scripts = [
+    ['tools/idea/collect.sh', '/linked-issues.jq'],
+    ['tools/review/collect-inputs.sh', '/../idea/linked-issues.jq'],
+  ];
+  it.each(scripts)("%s reads only this repo's issues, with the shared filter", (file, jq) => {
+    const text = read(file);
+    expect(text).toContain(`jq -r -f "$(dirname "$0")${jq}"`);
+    expect(text).not.toContain('.closingIssuesReferences[].number');
+  });
+  it('the list is read before the loop, so a failed lookup is not "no linked issues"', () => {
+    expect(read('tools/idea/collect.sh')).toMatch(/linked=\$\(gh pr view[\s\S]*?\n {2}for n in \$linked; do/);
+    expect(read('tools/review/collect-inputs.sh')).toMatch(/issues=\$\(gh pr view[\s\S]*?\) \|\| return 1/);
+  });
+  it.each([
+    ['tools/idea/collect.sh', 'rm -f "$out/linked-start.json" "$out/linked-comments.json"\n      continue'],
+    ['tools/review/collect-inputs.sh', 'rm -f "$tmp/pages-$n.json" "$tmp/issue-$n.json"\n      continue'],
+  ])('%s skips an unreadable issue and removes its files', (file, skip) => {
+    expect(read(file)).toContain(skip);
+  });
+});
+
 describe('idea gate rule files', () => {
   const agent = read('.claude/agents/idea-reviewer.md');
   const schema = JSON.parse(read('tools/idea/schema.json'));
@@ -181,6 +203,16 @@ describe('idea gate rule files', () => {
     expect(read('CLAUDE.md')).toContain('copy its **What will be built** lines and its **Assumptions**');
     expect(read('tools/review/prompts/code.md')).toContain('review-input/idea-brief.md');
     expect(read('tools/review/collect-inputs.sh')).toContain('brief.mjs');
+  });
+
+  it('the builder knows what to do after "go anyway", and the reviewer checks it would be visible', () => {
+    const rules = read('CLAUDE.md');
+    expect(rules).toContain('**After "go anyway"**');
+    expect(rules).toContain('🛑 blockers still stand');
+    expect(rules).toContain('already said "go anyway" twice');
+    expect(rules).toContain('Never call it "from the idea check"');
+    expect(rules).toContain('shows nothing she can see today');
+    expect(read('docs/IDEA-CHECKLIST.md')).toContain("she wouldn't see any change today");
   });
 
   it('idea-input/ is never committed', () => {
