@@ -5,6 +5,7 @@ import { expand, key, repeatWorks, runProgram, walkArrows } from '../../../games
 import { FALLBACK, TRIES, generate } from '../../../games/arrow-path/generate.js';
 import { LEVELS, MAX_SLOTS, isFirstOfKind, rulesFor } from '../../../games/arrow-path/levels.js';
 import { minTurns, shortestMoves } from '../../../games/arrow-path/solve.js';
+import { restoreArrows, restoreProgram } from '../../../games/arrow-path/view.js';
 import { createRng } from '../../../js/core/rng.js';
 
 /** @typedef {import('../../../games/arrow-path/engine.js').Puzzle} Puzzle */
@@ -274,5 +275,36 @@ describe('arrow-path puzzles at every level', () => {
       expect(puzzle).toEqual(FALLBACK[rulesFor(level).mode]);
       expect(puzzle).not.toBe(FALLBACK[rulesFor(level).mode]); // a copy, so a game can't change the original
     }
+  });
+});
+
+describe('arrow-path resume (saved progress, D7)', () => {
+  const board = grid({ mode: 'board', gem: [2, 2], rocks: [[1, 1]] });
+  const list = grid({ slots: 3, loops: false });
+
+  it('brings back saved arrows, dropping any that no longer make sense', () => {
+    expect(restoreArrows(board, { arrows: { '0,2': 'D' } })).toEqual({ '0,2': 'D' });
+    const odd = { '0,0': 'D', '2,2': 'L', '1,1': 'U', '9,9': 'R', '0,1': 'X', 'a,b': 'R', '1,2': 'L' };
+    expect(restoreArrows(board, { arrows: odd })).toEqual({ '1,2': 'L' });
+    for (const junk of [null, undefined, 5, 'x', { arrows: 3 }, { arrows: null }, { program: ['R'] }]) {
+      expect(restoreArrows(board, junk)).toEqual({});
+    }
+  });
+
+  it('brings back a saved move list, or starts fresh if it does not fit this puzzle', () => {
+    expect(restoreProgram(list, { program: ['R', 'D'] })).toEqual(['R', 'D']);
+    expect(restoreProgram(list, { program: ['R', 'R', 'R', 'R'] })).toEqual([]); // too long
+    expect(restoreProgram(list, { program: ['R', 'x2'] })).toEqual([]); // no 🔁 at this level
+    expect(restoreProgram({ ...list, loops: true }, { program: ['R', 'x2'] })).toEqual(['R', 'x2']);
+    expect(restoreProgram(list, { program: ['R', 'Q'] })).toEqual([]);
+    for (const junk of [null, 7, { program: 'RD' }, { arrows: {} }]) expect(restoreProgram(list, junk)).toEqual([]);
+  });
+
+  it('starts a debug puzzle from its almost-right list, and never changes the puzzle', () => {
+    const debug = grid({ mode: 'debug', slots: 4, program: ['R', 'D'] });
+    const fresh = restoreProgram(debug, null);
+    expect(fresh).toEqual(['R', 'D']);
+    fresh.push('L');
+    expect(debug.program).toEqual(['R', 'D']);
   });
 });

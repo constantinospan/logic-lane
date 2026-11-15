@@ -146,12 +146,13 @@ test('debug: the list starts almost right; fixing the wrong arrow wins', async (
 });
 
 test('🏠 in the middle of a winning walk goes home cleanly, without counting the win', async ({ page }) => {
+  await page.clock.install(); // time stands still until runFor, so the walk can't finish before 🏠 is tapped
   const p = await open(page, 4);
   for (const [k, d] of Object.entries(/** @type {Record<string, Dir>} */ (p.solution))) await setArrow(page, k, d);
   await page.getByRole('button', { name: 'Go' }).click();
   await page.getByRole('button', { name: 'Home' }).click();
   await expect(page.locator('.home-title')).toBeVisible();
-  await page.waitForTimeout(1500); // walk timers left behind would fire now
+  await page.clock.runFor(5000); // walk timers left behind would fire now
   await expect(page.locator('.home-title')).toBeVisible();
   await expect(page.locator('.celebrate')).toHaveCount(0);
   expect(await readSave(page)).toMatchObject({ level: 4, n: 0, active: false }); // still this puzzle, for Continue

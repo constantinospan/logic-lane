@@ -59,7 +59,7 @@ function arrow(d, className = 'ap-arrow') {
  * @param {unknown} saved
  * @returns {Record<string, Dir>}
  */
-function restoreArrows(p, saved) {
+export function restoreArrows(p, saved) {
   /** @type {Record<string, Dir>} */
   const arrows = {};
   const arrowsIn = /** @type {{ arrows?: unknown } | null} */ (saved)?.arrows;
@@ -78,7 +78,7 @@ function restoreArrows(p, saved) {
  * @param {unknown} saved
  * @returns {Token[]}
  */
-function restoreProgram(p, saved) {
+export function restoreProgram(p, saved) {
   const list = /** @type {{ program?: unknown } | null} */ (saved)?.program;
   const ok = Array.isArray(list) && list.length <= (p.slots ?? 0) &&
     list.every((t) => isToken(t) && (p.loops || isDir(t)));

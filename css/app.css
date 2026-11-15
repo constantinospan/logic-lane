@@ -407,7 +407,7 @@ button {
 /* ---------- Arrow Path ---------- */
 
 .ap {
-  --ap-gap: 6px;
+  --ap-gap: 8px; /* checklist: at least 8 px between tap targets */
   width: 100%;
   display: flex;
   flex-direction: column;

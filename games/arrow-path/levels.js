@@ -17,7 +17,8 @@
  * @property {number} [turns]  board: the exact number of arrows needed.
  * @property {number} [minLength]  board: the planned route is at least this many steps.
  * @property {number} [blockers]  board: at most this many rocks placed to block shortcuts.
- * @property {[number, number]} [steps]  moves without loops / debug without loops: shortest route length [min, max].
+ * @property {[number, number]} [steps]  moves without loops: shortest route length [min, max]. debug without loops: the
+ *   length of the planned list.
  * @property {number} [loopRuns]  Straight runs of 3+ that need 🔁 (0 = no loops at this level).
  * @property {number} [bugs]  debug: arrows turned the wrong way in the starting list.
  */
