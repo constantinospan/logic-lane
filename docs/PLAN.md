@@ -106,6 +106,9 @@ Notes:
 - Step 6c proven (2026-11-15, issues #45–#47): four guesses were all asked as questions and the builder didn't start
   (#47). #45 and #46 didn't hit the cap: the reviewer bundled guesses (e.g. "picture and message") to land on exactly
   3, so a rule now says one assumption per separate choice. #46 also showed the new nothing-to-see rule working.
+- Step 8 built (2026-11-15), in review: Arrow Path (D22). Idea check: build, after answer 1c. Owner chose one-arrow
+  loops, tap-to-turn board arrows, robot and gem, no stuck help. Plan reviewed by a fresh agent first (fixed: loop
+  input, one meaning per tap, fast loop/debug checks, move-list screens fitting the phone). Tick after merge.
 - Fixed (2026-11-14): the WebKit "New!" update test failed twice in CI. Reproduced in Linux WebKit (Playwright's
   Docker image): 3 of 150 taps on "New!" did nothing, because WebKit lost the "take over" message. The app now
   sends it again every second until the new version takes over (`js/pwa/update.js`). Proven: 300 of 300 passed after

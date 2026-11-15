@@ -33,6 +33,26 @@ test('play screen has no accessibility problems', async ({ page }) => {
   expect(await violations(page)).toEqual([]);
 });
 
+for (const level of [1, 11, 14, 21]) {
+  test(`Arrow Path level ${level} has no accessibility problems`, async ({ page }) => {
+    await page.goto('./');
+    await page.evaluate((lvl) => {
+      const save = { gameId: 'arrow-path', gameVersion: 1, level: lvl, n: 0, seed: 'a11y00', state: null,
+        active: true, savedAt: Date.now() };
+      localStorage.setItem('logic-lane:resume', JSON.stringify(save));
+    }, level);
+    await page.goto('./#/play/arrow-path');
+    await expect(page.locator('.ap-grid')).toBeVisible();
+    if (level > 10) {
+      await page.locator('.ap-key').first().click(); // a filled slot
+      await page.locator('.ap-slot').first().click(); // and selected
+    } else {
+      await page.locator('.ap-tap').first().click(); // a square with an arrow
+    }
+    expect(await violations(page)).toEqual([]);
+  });
+}
+
 test('celebration has no accessibility problems', async ({ page }) => {
   await page.clock.install();
   await startDemo(page);

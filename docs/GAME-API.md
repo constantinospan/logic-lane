@@ -1,6 +1,8 @@
 # Adding a game
 
-Every game is one ES module in `games/<id>/game.js` that default-exports a **Game** object. The shared base does
+Every game has an ES module `games/<id>/game.js` that default-exports a **Game** object. It may split its code into
+more modules in the same folder (e.g. Arrow Path: `levels.js`, `engine.js`, `generate.js`, `solve.js`, `view.js`), so
+the rules can be unit-tested without a browser. A game never imports another game's files. The shared base does
 the rest: home tile, difficulty picker, top bar (🏠, level, 🔊), resume after accidents, celebration, the
 ladder, and offline support.
 
@@ -11,7 +13,8 @@ The exact contract, with types, is the `Game` typedef in [`js/core/games.js`](..
 1. Create `games/<id>/game.js` exporting the Game object (below).
 2. Register it in `js/core/games.js`: import it, add it to `GAMES`, and remove it from `COMING_SOON` if it's
    listed there.
-3. Add every new file to `PRECACHE` in `sw.js`, or it won't work offline. A test checks this.
+3. Add every new file to `PRECACHE` in `sw.js`, or it won't work offline. A test checks this. Styles go in a
+   section of `css/app.css`.
 4. Add `tests/unit/games/<id>.test.js` proving, for many seeds at every level:
    - every generated puzzle is solvable (use a solver);
    - every puzzle stays within that level's difficulty rules.

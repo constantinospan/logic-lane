@@ -23,20 +23,21 @@ test.beforeEach(async ({ context }) => {
 });
 
 /**
- * Open the demo on a fixed puzzle (seed and level), through a saved game, like a resume.
+ * Open a game on a fixed puzzle (seed and level), through a saved game, like a resume.
  * @param {import('@playwright/test').Page} page
  * @param {number} level
+ * @param {{ id: string, version: number, ready: string }} game  `ready`: a selector that shows the puzzle is drawn.
  */
-async function openPuzzle(page, level = 1) {
+async function openPuzzle(page, level = 1, game = { id: 'demo', version: 1, ready: '.demo-choice' }) {
   await page.goto('./');
-  await page.evaluate((lvl) => {
-    const save = { gameId: 'demo', gameVersion: 1, level: lvl, n: 0, seed: 'visual', state: null, active: true,
+  await page.evaluate(([lvl, id, version]) => {
+    const save = { gameId: id, gameVersion: version, level: lvl, n: 0, seed: 'visual', state: null, active: true,
       savedAt: Date.now() };
     localStorage.setItem('logic-lane:resume', JSON.stringify(save));
-  }, level);
-  await page.goto('./#/play/demo');
-  await expect(page.locator('.demo-choice').first()).toBeVisible();
-  expect(await readSave(page)).toMatchObject({ level, seed: 'visual' }); // really the fixed puzzle
+  }, /** @type {[number, string, number]} */ ([level, game.id, game.version]));
+  await page.goto(`./#/play/${game.id}`);
+  await expect(page.locator(game.ready).first()).toBeVisible();
+  expect(await readSave(page)).toMatchObject({ gameId: game.id, level, seed: 'visual' }); // really the fixed puzzle
 }
 
 /** @param {import('@playwright/test').Page} page @param {string} name */
@@ -73,6 +74,16 @@ test('play at the top level', async ({ page }) => {
   await openPuzzle(page, 30);
   await snap(page, 'play-top');
 });
+
+// Arrow Path: one picture per kind of level (D22).
+const ARROW_PATH = { id: 'arrow-path', version: 1, ready: '.ap-grid' };
+for (const [name, level] of /** @type {[string, number][]} */ ([['board', 4], ['moves', 11], ['loops', 14],
+  ['debug', 21]])) {
+  test(`arrow path ${name}`, async ({ page }) => {
+    await openPuzzle(page, level, ARROW_PATH);
+    await snap(page, `arrow-path-${name}`);
+  });
+}
 
 test('celebration', async ({ page }) => {
   await page.clock.install();

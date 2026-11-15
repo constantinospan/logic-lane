@@ -321,3 +321,21 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   the assumptions and "Decided from your answers", so the owner's replies make sense. It's context, not
   instructions. Notes in it are optional and never change what gets built.
 
+
+### D22. Arrow Path design (owner, 2026-11-15, plan step 8)
+- **Three kinds of level** (idea check answer 1c): levels 1–10, she taps squares to put arrows on the board, and the
+  robot walks straight and turns on them. Levels 11–20, she builds a list of moves under the board and presses Go.
+  Levels 21–30, the list starts almost right (1 wrong arrow, then 2 from 26) and she fixes it. Easy, Medium and Hard
+  start at the first level of each kind (1, 11, 21).
+- **Loops:** from level 14, 🔁×2 and 🔁×3 repeat the arrow just before them, and take one slot. The list has too few
+  slots to write every step, so a repeat is needed. Debug lists use 🔁 from 24. Repeating a group of moves (e.g.
+  stairs) is left for later, as its own request.
+- **Board arrows:** tap a square to turn its arrow (→ ↓ ← ↑, then empty). No limit on arrows; exactly the level's
+  number of arrows is the fewest that works (the solver proves it).
+- **Taps mean one thing at every level:** an arrow button adds a move at the end, or replaces the selected slot.
+  Tapping a slot selects it. ✖ takes away the selected move, or the last one.
+- **Pictures:** a robot 🤖 and a gem 💎, rocks 🪨. Emoji only, arrows drawn as SVG.
+- **Mistakes:** the robot wiggles where it stopped and goes back to the start. Her arrows or moves stay. 🔊 says a short
+  hint ("Oops! Try again."). No stuck help, no glow, no hint button (owner chose "No help").
+- **Generator:** the route comes first, then the puzzle around it, checked by solvers. If 500 tries all fail (never
+  seen in tests), a fixed simple puzzle is used, so endless play never breaks.

@@ -403,3 +403,279 @@ button {
   font-size: 48px;
   line-height: 1;
 }
+
+/* ---------- Arrow Path ---------- */
+
+.ap {
+  --ap-gap: 6px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap);
+}
+
+/* Board mode: squares are tapped, so they stay ≥ 64 px on a 390 px phone (5 columns at most). */
+.ap-mode-board {
+  --cell: min(
+    84px,
+    calc((100vw - 2 * var(--gap) - (var(--cols) - 1) * var(--ap-gap)) / var(--cols)),
+    calc((100dvh - 230px - (var(--rows) - 1) * var(--ap-gap)) / var(--rows))
+  );
+}
+
+/* Move-list mode: squares aren't tapped, so they can be smaller to leave room for the moves and the buttons. */
+.ap-mode-list {
+  --cell: min(
+    56px,
+    calc((100vw - 2 * var(--gap) - (var(--cols) - 1) * var(--ap-gap)) / var(--cols)),
+    calc((100dvh - 470px - (var(--rows) - 1) * var(--ap-gap)) / var(--rows))
+  );
+}
+
+.ap-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), var(--cell));
+  grid-auto-rows: var(--cell);
+  gap: var(--ap-gap);
+}
+
+.ap-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cell);
+  height: var(--cell);
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 2px #d9e2ec;
+  font-size: calc(var(--cell) * 0.55);
+  line-height: 1;
+  color: var(--ink);
+}
+
+.ap-tap:active {
+  background: #fff3d1;
+}
+
+.ap-start {
+  background: #e0f4f1;
+}
+
+.ap-rock {
+  background: #d9e2ec;
+  box-shadow: none;
+}
+
+.ap-gem {
+  background: #fff3d1;
+}
+
+.ap-arrow {
+  display: flex;
+  width: 70%;
+  height: 70%;
+  color: var(--sky);
+}
+
+.ap-arrow svg,
+.ap-face svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ap-D svg {
+  transform: rotate(90deg);
+}
+
+.ap-L svg {
+  transform: rotate(180deg);
+}
+
+.ap-U svg {
+  transform: rotate(270deg);
+}
+
+/* The robot sits on top of the grid and slides from square to square. */
+.ap-robot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cell);
+  height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transform: translate(
+    calc(var(--c, 0) * (var(--cell) + var(--ap-gap))),
+    calc(var(--r, 0) * (var(--cell) + var(--ap-gap)))
+  );
+  transition: transform var(--step, 380ms) linear;
+}
+
+.ap-robot.ap-instant {
+  transition: none;
+}
+
+.ap-bot {
+  font-size: calc(var(--cell) * 0.6);
+  line-height: 1;
+}
+
+.ap-robot.ap-bump .ap-bot {
+  animation: wiggle 0.4s ease-in-out;
+}
+
+.ap-robot.ap-happy .ap-bot {
+  animation: pop 0.45s ease-out;
+}
+
+.ap-face {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: flex;
+  width: 34%;
+  height: 34%;
+  color: var(--ink);
+}
+
+.ap-go {
+  min-width: 140px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-size: 1.4rem;
+}
+
+.ap-busy .ap-go,
+.ap-busy .ap-key,
+.ap-busy .ap-slot,
+.ap-busy .ap-tap {
+  cursor: default;
+}
+
+/* Move list and its buttons. */
+.ap-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap);
+}
+
+.ap-slots,
+.ap-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: calc(5 * var(--tap) + 4 * 8px);
+}
+
+.ap-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: 3px solid #9aa5b1;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.ap-slot.ap-empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+.ap-slot.ap-selected {
+  border: 5px solid var(--ink);
+  background: var(--sun);
+  transform: translateY(-4px);
+}
+
+.ap-slot.ap-running {
+  background: #d2ecf7;
+}
+
+.ap-slot.ap-wrong {
+  border: 5px solid var(--coral);
+}
+
+.ap-slot.ap-idle {
+  border-style: dashed;
+  color: var(--ink-soft);
+}
+
+.ap-slot .ap-arrow {
+  width: 60%;
+  height: 60%;
+}
+
+.ap-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  padding: 0;
+}
+
+.ap-key .ap-arrow {
+  width: 60%;
+  height: 60%;
+}
+
+.ap-loop-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.ap-loop-n {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.ap-key-loop,
+.ap-slot:has(.ap-loop-icon) {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ap-remove {
+  color: var(--coral);
+  font-size: 26px;
+}
+
+.ap-keys .ap-go {
+  min-width: calc(2 * var(--tap) + 8px);
+}
+
+/* Wide screens: the move list sits beside the board. */
+@media (min-width: 900px) and (orientation: landscape) {
+  .ap-mode-list {
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+    gap: calc(var(--gap) * 2);
+    --cell: min(72px, calc((100dvh - 150px - (var(--rows) - 1) * var(--ap-gap)) / var(--rows)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-robot {
+    transition: none;
+  }
+
+  .ap-robot.ap-bump .ap-bot,
+  .ap-robot.ap-happy .ap-bot,
+  .ap-slot.ap-selected {
+    animation: none;
+    transform: none;
+  }
+}
