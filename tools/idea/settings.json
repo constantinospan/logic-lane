@@ -1,4 +1,4 @@
 {
-  "enabled": true,
-  "maxAssumptions": 3
+  "enabled": false,
+  "maxAssumptions": 10
 }
