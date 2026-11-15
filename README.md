@@ -114,3 +114,5 @@ Details: [docs/TESTING.md](docs/TESTING.md).
 - Rules for AI agents: [CLAUDE.md](CLAUDE.md)
 - Adding a game: [docs/GAME-API.md](docs/GAME-API.md)
 - Testing: [docs/TESTING.md](docs/TESTING.md)
+
+This branch is a throwaway test.
