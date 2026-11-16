@@ -27,6 +27,20 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | O2 | Cloud session | Start a claude.ai/code session from the Claude app: it works on a branch in the cloud and opens the PR. Nothing to build; on first use, run the "first time a claude.ai/code session is used" checks in the progress notes | 15 min | ~30 min |
 | O3 | Scheduled agent | A routine that picks the next issue labelled `ready`, with rules for what it may pick and a cap on runs to protect the Max quota. After 6c and step 8 | 15 min | 1.5–2 h |
 
+**Optional, later: measuring the AI pipeline (owner's learning, never blocks games).** Python, in learning mode:
+Claude writes most of it, the owner writes a few small pieces with Claude's outline, tests and review. Python is
+for offline tools only and is never shipped (decision D23, recorded when work starts). Packages: pytest only,
+pinned with uv (owner approved, 2026-11-15).
+
+| # | Item | What happens | Your time | Claude's time |
+|---|------|--------------|-----------|---------------|
+| E1 | Save the logs | **Before 12 February 2027**, when GitHub starts deleting the first run logs (kept 90 days): save every AI run log, review comment and label to local files, outside the repo. No packages needed | — | ~1 h |
+| E2 | Measure and eval | Rebuild the pipeline's numbers with one command, a planted-bug test of the code reviewer (bugs and clean changes, repeated runs), then change one thing (e.g. the model) and compare | 8 to 12 h | ~25 h |
+
+Decisions to take when E2 starts: who does the local Python setup, where data lives, how the eval runs the
+reviewers, which reviewers, how many cases, the one change to compare, how findings get labelled, pinning the model,
+and a scheduled run.
+
 **Totals (rough):** you ~1.5 h spread across steps 1, 2, 3, 7, 9; Claude ~1.5–2 days of work sessions.
 
 Notes:
