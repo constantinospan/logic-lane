@@ -12,9 +12,7 @@
       "storage module",
       "savestate",
       "storage.js",
-      "long-term",
-      "progress",
-      "d7"
+      "long-term"
     ]
   },
   "why": "Games must save only through api.saveState / js/core/storage.js and never touch localStorage (CLAUDE.md, GAME-API, checklist §5), and a best streak kept forever is long-term progress, which D7 rules out."

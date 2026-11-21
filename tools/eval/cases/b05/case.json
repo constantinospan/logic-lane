@@ -11,8 +11,6 @@
       "absolute",
       "relative",
       "/sw.js",
-      "/logic-lane/",
-      "root",
       "./sw.js"
     ]
   },

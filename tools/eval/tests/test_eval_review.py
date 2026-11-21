@@ -1,7 +1,9 @@
 """Tests for eval_review.py's setup: these never start Claude. Run: uv run pytest -v"""
 import json
 import os
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -98,6 +100,20 @@ def test_folder_has_the_rules_but_never_the_eval(folder):
     assert not (root / ".git").exists()  # a plain copy, not linked to this repo
 
 
+def test_folder_code_is_base_but_rules_are_the_rules_commit(folder):
+    # GitHub's root is main, which is also the PR's origin/main: so code comes from BASE, rules from the commit.
+    root, _ = folder
+    base, head = ev.base_commit(), "HEAD"
+    assert (root / "docs" / "PLAN.md").read_text() == ev.git("show", f"{base}:docs/PLAN.md", cwd=ev.REPO_ROOT)
+    assert (root / "docs" / "DECISIONS.md").read_text() == ev.git("show", f"{head}:docs/DECISIONS.md", cwd=ev.REPO_ROOT)
+    assert (root / "js" / "core" / "storage.js").read_text() == ev.git("show", f"{base}:js/core/storage.js", cwd=ev.REPO_ROOT)
+
+
+def test_git_ignores_the_owners_git_settings():
+    assert ev.GIT_ENV["GIT_CONFIG_GLOBAL"] == "/dev/null" and ev.GIT_ENV["GIT_CONFIG_NOSYSTEM"] == "1"
+    assert "HOME" not in ev.GIT_ENV
+
+
 def test_pr_history_is_base_plus_the_case_only(folder):
     root, sha = folder
     pr = root / "pr"
@@ -142,11 +158,37 @@ def test_clean_env_keeps_only_what_the_run_needs(tmp_path, monkeypatch):
     assert env["HOME"] == str(tmp_path / "home") != os.environ.get("HOME")
 
 
-def test_sandbox_blocks_the_home_folder_but_not_claude_itself():
-    profile = ev.sandbox_profile(ev.Path("/Users/someone"))
-    assert '(deny file-read* file-write* (subpath "/Users/someone")' in profile
+def test_sandbox_blocks_home_repo_and_other_runs_but_not_claude_or_its_own_run():
+    own = ev.RUNS_TMP / "run-abc"
+    profile = ev.sandbox_profile(ev.Path("/Users/someone"), own, ["/srv/repo", "/srv/repo/.git"])
+    runs = os.path.realpath(ev.RUNS_TMP)
+    assert (f'(deny file-read* file-write* (subpath "/Users/someone") (subpath "{runs}") (subpath "/srv/repo") '
+            f'(subpath "/srv/repo/.git") (regex') in profile
     assert '(allow file-read* (subpath "/Users/someone/.local/bin") (subpath "/Users/someone/.local/share/claude"))' in profile
-    assert ev.sandboxed(["claude"])[:2] == ["sandbox-exec", "-p"]
+    assert profile.splitlines()[-1] == f'(allow file-read* file-write* (subpath "{os.path.realpath(own)}"))'
+    assert ev.sandboxed(["claude"], own)[:2] == ["sandbox-exec", "-p"]
+
+
+def test_repo_dirs_include_the_git_folder():
+    dirs = ev.repo_dirs()
+    assert os.path.realpath(ev.REPO_ROOT) in dirs
+    assert any(os.path.isfile(os.path.join(d, "HEAD")) for d in dirs)  # the git folder itself
+
+
+@pytest.mark.skipif(not shutil.which("sandbox-exec"), reason="macOS only")
+def test_sandbox_really_blocks_the_repo_and_other_runs():
+    # No Claude here: plain cat under the same profile, so it's quick and costs nothing.
+    ev.RUNS_TMP.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=ev.RUNS_TMP) as own, tempfile.TemporaryDirectory(dir=ev.RUNS_TMP) as other:
+        (Path(own) / "mine.txt").write_text("mine")
+        (Path(other) / "theirs.txt").write_text("theirs")
+
+        def cat(path):
+            return subprocess.run(ev.sandboxed(["/bin/cat", str(path)], Path(own)), capture_output=True, text=True)
+
+        assert cat(Path(own) / "mine.txt").stdout == "mine"
+        assert cat(Path(other) / "theirs.txt").returncode != 0
+        assert cat(ev.EVAL_DIR / "cases" / "BASE").returncode != 0
 
 
 def test_fetch_head_does_not_name_the_real_repo(folder):

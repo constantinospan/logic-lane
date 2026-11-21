@@ -16,7 +16,9 @@ A "record" is one saved run (out/<time>/<case>-<run>.json), made by eval_review.
                      where a finding is {"title": "...", "evidence": "...", "where": "file:line"} ("where" may
                      be missing)
   record["error"]    only there if the run crashed or timed out
-  record["raw"]      the full answer from `claude -p` (has "total_cost_usd", "num_turns", "duration_ms"), or None
+  record["raw"]      the full answer from `claude -p` (has "total_cost_usd", "num_turns", "duration_ms",
+                     "modelUsage"), or None
+  record["denials"]  how many tool calls were blocked (like the job's "Blocked tool calls" step), maybe missing
 """
 from __future__ import annotations
 
@@ -55,6 +57,12 @@ def cost(record: dict) -> dict:
             "seconds": float(record.get("seconds") or 0)}
 
 
+def models(record: dict) -> list[str]:
+    """The models a run used, from the raw answer."""
+    raw = record.get("raw") if isinstance(record.get("raw"), dict) else {}
+    return sorted(raw.get("modelUsage") or {})
+
+
 # ---------- Scoring one run ----------
 
 def score_run(record: dict) -> dict:
@@ -73,10 +81,13 @@ def score_run(record: dict) -> dict:
                                 a finding that matches OR points at the planted file is part of the catch (one
                                 bug often gets several right findings).
       "cost_usd", "turns", "seconds"   from cost(record); error runs cost something too
+      "denials"                 blocked tool calls (0 if unknown): a run that lost its tools may review less
+      "models"                  from models(record)
     """
     expect = record["expect"]
     result = {"case": record["case"], "run": record["run"], "hidden": record["hidden"], "kind": expect["kind"],
-              "weak": False, "false_alarms": 0, "extra": 0, **cost(record)}
+              "weak": False, "false_alarms": 0, "extra": 0, **cost(record),
+              "denials": int(record.get("denials") or 0), "models": models(record)}
 
     review = record.get("review")
     if record.get("error") or not isinstance(review, dict):
@@ -104,8 +115,10 @@ def _count(runs: list[dict], outcome: str) -> int:
 def report(scored: list[dict], meta: dict) -> str:
     """A short markdown report of a whole eval: a table per visible case, one combined line for the hidden cases
     (counts only, never their ids, so nothing about a single hidden case leaks), and totals over every run."""
+    used = sorted({m for s in scored for m in s.get("models", [])})
     lines = ["## Eval report", "",
-             f"Claude Code: {meta['local_cli']} (GitHub: {meta['action_cli']})", "",
+             f"Claude Code: {meta['local_cli']} (GitHub: {meta['action_cli']})",
+             f"Model: {', '.join(used) or 'unknown'}", "",
              "| Case | Kind | Runs | Caught | Missed | Weak | False alarms | Errors |",
              "|---|---|---|---|---|---|---|---|"]
 
@@ -122,7 +135,8 @@ def report(scored: list[dict], meta: dict) -> str:
 
     hidden = [s for s in scored if s["hidden"]]
     lines += ["", f"Hidden cases: {len({s['case'] for s in hidden})} cases, {len(hidden)} runs: "
-                  f"{_count(hidden, 'caught')} caught, {_count(hidden, 'missed')} missed, "
+                  f"{_count(hidden, 'caught')} caught, {_count(hidden, 'missed')} missed "
+                  f"({sum(1 for s in hidden if s['weak'])} weak), "
                   f"{sum(s['false_alarms'] for s in hidden)} false alarms, {_count(hidden, 'error')} errors"]
 
     bugs = [s for s in scored if s["kind"] != "clean" and s["outcome"] != "error"]
@@ -133,6 +147,8 @@ def report(scored: list[dict], meta: dict) -> str:
               f"False alarms on clean cases: {sum(s['false_alarms'] for s in clean)} in {len(clean)} runs",
               f"Extra findings on bug cases: {sum(s['extra'] for s in scored)}",
               f"Errors: {_count(scored, 'error')} of {len(scored)} runs",
+              f"Blocked tool calls: {sum(s['denials'] for s in scored)} in "
+              f"{sum(1 for s in scored if s['denials'])} runs",
               f"Cost: ${sum(s['cost_usd'] for s in scored):.2f}, turns: {sum(s['turns'] for s in scored)}, "
               f"time: {round(sum(s['seconds'] for s in scored) / 60)} min"]
     return "\n".join(lines) + "\n"

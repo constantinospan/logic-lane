@@ -8,16 +8,16 @@
     "kind": "bug",
     "file": "games/arrow-path/generate.js",
     "match": [
-      "generator test",
       "no test",
       "no unit test",
-      "unit test",
       "isn't tested",
       "not tested",
       "untested",
       "doesn't test",
       "missing test",
-      "without test"
+      "without test",
+      "lacks a test",
+      "doesn't cover"
     ]
   },
   "why": "CLAUDE.md step 3 and checklist §3/§5: new generator rules need generator tests that check every puzzle stays within the level's rules; nothing tests the new gemDistance rule."

@@ -7,15 +7,15 @@
   "expect": {
     "kind": "claim",
     "match": [
-      "claims",
+      "claims a test",
+      "claims a unit test",
+      "claimed test",
+      "claimed unit test",
       "no test",
-      "no unit test",
-      "no new test",
       "378",
       "379",
-      "was added",
-      "not added",
       "isn't in the diff",
+      "not in the pr",
       "false claim"
     ]
   },

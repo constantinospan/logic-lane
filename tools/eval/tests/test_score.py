@@ -1,4 +1,4 @@
-"""Tests for score.py. The owner's part (score_run, report) is done when these all pass:
+"""Tests for score.py: what each scoring rule and the report must do. Run:
 
     uv run pytest tests/test_score.py -v
 """
@@ -7,7 +7,7 @@ import score
 BUG = {"kind": "bug", "file": "games/demo/game.js", "match": ["localstorage", "storage module"]}
 CLAIM = {"kind": "claim", "match": ["no test", "claims"]}
 CLEAN = {"kind": "clean"}
-RAW = {"total_cost_usd": 0.5, "num_turns": 12, "duration_ms": 90000}
+RAW = {"total_cost_usd": 0.5, "num_turns": 12, "duration_ms": 90000, "modelUsage": {"claude-sonnet-5-5": {}}}
 
 
 def f(title, evidence="", where=None):
@@ -142,7 +142,7 @@ def scored_set():
         rec(BUG, [], [f("localStorage maybe")], case="b01", run=2),
         rec(BUG, error="timeout", case="b01", run=3),
         rec(CLEAN, [f("Bogus")], case="c01", run=1),
-        rec(CLEAN, [], case="c01", run=2),
+        rec(CLEAN, [], case="c01", run=2, denials=1),
         rec(BUG, [f("Uses localStorage")], case="b03", run=1, hidden=True),
         rec(CLEAN, [f("X"), f("Y")], case="c03", run=1, hidden=True),
     ]
@@ -153,6 +153,15 @@ def test_report_heading_and_versions():
     text = score.report(scored_set(), META)
     assert text.splitlines()[0] == "## Eval report"
     assert "Claude Code: 2.1.330 (Claude Code) (GitHub: 2.1.300)" in text
+    assert "Model: claude-sonnet-5-5" in text
+
+
+def test_score_keeps_denials_and_models():
+    s = score.score_run(rec(BUG, denials=2))
+    assert s["denials"] == 2 and s["models"] == ["claude-sonnet-5-5"]
+    r = rec(BUG)
+    r["raw"] = None
+    assert score.score_run(r)["denials"] == 0 and score.score_run(r)["models"] == []
 
 
 def test_report_table_rows():
@@ -168,7 +177,7 @@ def test_report_table_rows():
 def test_report_hides_hidden_case_ids():
     text = score.report(scored_set(), META)
     assert "b03" not in text and "c03" not in text
-    assert "Hidden cases: 2 cases, 2 runs: 1 caught, 0 missed, 2 false alarms, 0 errors" in text
+    assert "Hidden cases: 2 cases, 2 runs: 1 caught, 0 missed (0 weak), 2 false alarms, 0 errors" in text
 
 
 def test_report_totals():
@@ -177,6 +186,7 @@ def test_report_totals():
     assert "False alarms on clean cases: 3 in 3 runs" in text
     assert "Extra findings on bug cases: 0" in text
     assert "Errors: 1 of 7 runs" in text
+    assert "Blocked tool calls: 1 in 1 runs" in text
     assert "Cost: $3.50, turns: 84, time: 14 min" in text
 
 

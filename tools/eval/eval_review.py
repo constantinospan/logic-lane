@@ -36,7 +36,13 @@ OWNER = "constantinospan"
 REPO = "constantinospan/logic-lane"
 KEYCHAIN_SERVICE = "logic-lane-eval"  # where the eval's login token is kept (README)
 RUN_TIMEOUT_S = 30 * 60  # the code-review job's timeout
-RUNS_TMP = Path("/tmp/ll-eval-runs")  # throwaway run folders: outside the home folder, which the sandbox blocks
+RUNS_TMP = Path("/private/tmp/ll-eval-runs")  # throwaway run folders, outside the home folder (the sandbox blocks it)
+# The files the eval is testing (and E2d's rule fixes change). The run folder's root is main's code as of BASE,
+# like the PR's own base, with only these taken from the rules commit.
+RULE_PATHS = ["CLAUDE.md", ".claude", "docs/REVIEW-CHECKLIST.md", "docs/DECISIONS.md", "tools/review"]
+# git for building run folders: none of the owner's own git settings, which could change diffs or commits.
+GIT_ENV = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "en_US.UTF-8",
+           "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"}
 
 
 # ---------- Cases ----------
@@ -158,7 +164,7 @@ def ci_inputs(template_json: dict, template_lines: list[str], counts: dict, head
 # ---------- The throwaway folder ----------
 
 def git(*args: str, cwd: Path | None = None, input: bytes | None = None) -> str:
-    r = subprocess.run(["git", *args], cwd=cwd, input=input, capture_output=True)
+    r = subprocess.run(["git", *args], cwd=cwd, input=input, capture_output=True, env=GIT_ENV)
     if r.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)}: {r.stderr.decode(errors='replace').strip()[:300]}")
     return r.stdout.decode(errors="replace")
@@ -167,14 +173,24 @@ def git(*args: str, cwd: Path | None = None, input: bytes | None = None) -> str:
 def build_run_folder(root: Path, rules_commit: str, base: str, case: dict) -> str:
     """Make `root` look like the code-review job's folder. Returns the case commit's SHA.
 
-    ./            the rules being evaluated: a plain copy (git archive) of rules_commit, without tools/eval/,
-                  so the reviewer can never read the cases or their answers. Not a worktree: a worktree points
-                  back to this repo.
+    ./            main as the reviewer sees it: a plain copy (git archive) of BASE, which is also pr/'s
+                  origin/main, with RULE_PATHS replaced by rules_commit's (the rules being evaluated). Without
+                  tools/eval/, so the reviewer can never read the cases or their answers. Not a worktree: a
+                  worktree points back to this repo.
     pr/           BASE's history only, origin/main = BASE, plus one commit with the case's change.
     review-input/ what tools/review/collect-inputs.sh writes.
     """
-    archive = subprocess.run(["git", "archive", rules_commit], cwd=REPO_ROOT, capture_output=True, check=True).stdout
-    subprocess.run(["tar", "-x", "-C", str(root)], input=archive, check=True)
+    def extract(commit: str, *paths: str) -> None:
+        archive = subprocess.run(["git", "archive", commit, "--", *paths], cwd=REPO_ROOT, capture_output=True,
+                                 check=True, env=GIT_ENV).stdout
+        subprocess.run(["tar", "-x", "-C", str(root)], input=archive, check=True)
+
+    extract(base)
+    for p in RULE_PATHS:
+        target = root / p
+        shutil.rmtree(target, ignore_errors=True) if target.is_dir() else target.unlink(missing_ok=True)
+    present = [p for p in RULE_PATHS if git("ls-tree", "--name-only", rules_commit, "--", p, cwd=REPO_ROOT).strip()]
+    extract(rules_commit, *present)
     shutil.rmtree(root / "tools" / "eval", ignore_errors=True)
 
     pr = root / "pr"
@@ -237,23 +253,33 @@ def claude_command(settings: dict, prompt: str, schema: str) -> list[str]:
             "--no-session-persistence"]
 
 
-def sandbox_profile(real_home: Path) -> str:
-    """A macOS sandbox rule set: the run may not read or write the owner's home folder (this repo, the cases,
-    notes, Claude memory), except Claude Code's own program files. Covers every command the reviewer starts,
-    Bash included. Claude's scratch folders under /tmp/claude-* are blocked too."""
-    home = str(real_home)
+def repo_dirs() -> list[str]:
+    """This repo's folder and its git folder (for a worktree, the main clone's .git), real paths."""
+    common = git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=REPO_ROOT).strip()
+    return [os.path.realpath(REPO_ROOT), os.path.realpath(common)]
+
+
+def sandbox_profile(real_home: Path, own_run: Path, repo: list[str]) -> str:
+    """A macOS sandbox rule set: the run may not read or write the owner's home folder (notes, Claude memory),
+    this repo (the cases and their answers) wherever it is, or other runs' folders (other cases, hidden ones
+    included), except Claude Code's own program files and its own run folder. Covers every command the reviewer
+    starts, Bash included. Claude's scratch folders under /tmp/claude-* are blocked too. Later rules win."""
+    home, runs, own = str(real_home), os.path.realpath(RUNS_TMP), os.path.realpath(own_run)
     allowed = [f"{home}/.local/bin", f"{home}/.local/share/claude"]
+    denied = [home, runs, *repo]
     return "\n".join([
         "(version 1)",
         "(allow default)",
-        f'(deny file-read* file-write* (subpath "{home}") (regex #"^/private/tmp/claude-"))',
+        "(deny file-read* file-write* " + " ".join(f'(subpath "{p}")' for p in denied)
+        + ' (regex #"^/private/tmp/claude-"))',
         "(allow file-read* " + " ".join(f'(subpath "{p}")' for p in allowed) + ")",
-        f'(allow file-read-metadata (literal "{home}"))',
+        f'(allow file-read-metadata (literal "{home}") (literal "{runs}"))',
+        f'(allow file-read* file-write* (subpath "{own}"))',
     ])
 
 
-def sandboxed(cmd: list[str]) -> list[str]:
-    return ["sandbox-exec", "-p", sandbox_profile(Path.home()), *cmd]
+def sandboxed(cmd: list[str], own_run: Path) -> list[str]:
+    return ["sandbox-exec", "-p", sandbox_profile(Path.home(), own_run, repo_dirs()), *cmd]
 
 
 def clean_env(token: str, config_dir: Path, job_env: dict) -> dict:
@@ -283,7 +309,8 @@ def run_one(case: dict, n: int, rules_commit: str, base: str, settings: dict, to
             sha = build_run_folder(root, rules_commit, base, case)
             prompt = fill_prompt(settings["prompt"], case["number"], sha)
             schema = json.dumps(json.loads(at_commit(rules_commit, SCHEMA)), separators=(",", ":"))
-            r = subprocess.run(sandboxed(claude_command(settings, prompt, schema)), cwd=root, capture_output=True, text=True,
+            r = subprocess.run(sandboxed(claude_command(settings, prompt, schema), Path(tmp)), cwd=root,
+                               capture_output=True, text=True,
                                env=clean_env(token, config, settings["env"]), timeout=RUN_TIMEOUT_S)
             record["exit_code"] = r.returncode
             record["stderr"] = r.stderr[-2000:]
@@ -351,12 +378,8 @@ def main(argv: list[str] | None = None) -> None:
             status = r.get("error") or ("ok" if r.get("review") else "no result")
             print(f"[{i}/{len(jobs)}] {r['case']} run {r['run']}: {status} ({r['seconds']}s)", file=sys.stderr)
 
-    import score  # the owner's part: turns the run files into a report
-    try:
-        report = score.report([score.score_run(r) for r in score.load_runs(out)], meta)
-    except NotImplementedError:
-        print(f"Runs saved in {out}. score.py isn't written yet, so no report.", file=sys.stderr)
-        return
+    import score  # turns the run files into a report
+    report = score.report([score.score_run(r) for r in score.load_runs(out)], meta)
     (out / "report.md").write_text(report, encoding="utf-8")
     print(report)
 

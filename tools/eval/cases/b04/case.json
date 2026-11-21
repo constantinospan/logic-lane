@@ -9,14 +9,15 @@
     "file": "sw.js",
     "match": [
       "response.ok",
+      "res.ok",
       "404",
-      "500",
       "error response",
-      "not ok",
-      "bad response",
-      "failed response",
       "error page",
-      "res.ok"
+      "bad response",
+      "not ok",
+      "4xx",
+      "non-200",
+      "status code"
     ]
   },
   "why": "Checklist §5 offline/update logic: cacheFirst now caches any response, including 404s and server errors, and then serves that broken copy for the rest of the version, so a temporary error during a deploy breaks the file for good."

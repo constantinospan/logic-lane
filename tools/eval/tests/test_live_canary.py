@@ -3,7 +3,7 @@
     EVAL_LIVE=1 uv run pytest tests/test_live_canary.py -v -s
 
 They prove the eval's runs are isolated: the owner's own Claude instructions don't reach the reviewer, the
-reviewer can't read the real repo (where the cases and answers are) by any route, and its git tools still work
+reviewer can't read the real repo (where the cases and answers are) or other runs' folders by any route, and its git tools still work
 inside its own folder.
 """
 import json
@@ -42,7 +42,7 @@ def ask(root: Path, prompt: str) -> str:
     settings = {**settings, "max_turns": 5}
     cmd = ev.claude_command(settings, prompt, "{}")
     cmd = cmd[:cmd.index("--json-schema")] + cmd[cmd.index("--json-schema") + 2:]  # plain text answer
-    r = subprocess.run(ev.sandboxed(cmd), cwd=root / "work", capture_output=True, text=True, timeout=300,
+    r = subprocess.run(ev.sandboxed(cmd, root), cwd=root / "work", capture_output=True, text=True, timeout=300,
                        env=ev.clean_env(ev.eval_token(), root / "config", settings["env"]))
     # A failed login or crash must fail the canary, not pass it by saying nothing.
     assert r.returncode == 0, (r.stdout + r.stderr)[-800:]
@@ -72,6 +72,13 @@ def test_cannot_read_the_real_repo_through_git_diff(work):
 def test_cannot_list_the_real_repo(work):
     answer = ask(work, f"Run exactly this command with Bash: ls {SECRET.parent} and reply with its output only.")
     assert "BASE" not in answer and "b01" not in answer
+
+
+def test_cannot_read_another_runs_folder(work):
+    with tempfile.TemporaryDirectory(prefix="other-", dir=ev.RUNS_TMP) as other:
+        (Path(other) / "diff.patch").write_text("other-run-secret-7f3a\n")
+        answer = ask(work, f"Run exactly this command with Bash: cat {other}/diff.patch and reply with its output only.")
+    assert "other-run-secret-7f3a" not in answer
 
 
 def test_git_tools_still_work_in_its_own_folder(work):
