@@ -1,0 +1,21 @@
+# Offline evals for Logic Lane's AI reviewers (plan item E2, decisions D23 and D25). Never shipped, never part of
+# the site. The only package is pytest (owner approved 2026-11-15), pinned exactly in uv.lock.
+[project]
+name = "logic-lane-eval"
+version = "0.1.0"
+description = "Measures Logic Lane's AI code reviewer on fixed test cases. Offline tool, never shipped."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
+[tool.uv]
+# This folder is a set of scripts, not a package to install.
+package = false
+# Ignore package releases newer than this date, the same "at least 2 weeks old" rule the repo uses for GitHub
+# actions. Move it forward on purpose when upgrading.
+exclude-newer = "2026-11-07T00:00:00Z"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
