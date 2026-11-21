@@ -386,7 +386,9 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   only plant what the code reviewer owns (checklist §3 code items, §5, §6, bugs), and change nothing visible.
   They're stored as data (`tools/eval/cases/`), never as live site files.
 - **Hidden cases** (`tools/eval/cases-hidden/`): kept out of the rule-fix agent's working folder (E2d), so it
-  can't teach to the test. How is decided when E2d is built, since this repo is public. The reviewer never sees any case's expected answer. Reports show hidden cases as counts only.
+  can't teach to the test. How is decided when E2d is built, since this repo is public. Reports show hidden cases
+  as counts only.
+- **No answers for the reviewer:** the reviewer never sees any case's expected answer, hidden or not.
 - **Scoring:** caught = a Blocking finding about the planted bug. Only a Suggestion counts as missed, because the PR
   would still pass. A run that crashes or doesn't finish is an error, not a miss (like D17's ⚠️). The headline false
   alarm number is Blocking findings on clean cases. The owner can relabel any result by hand.
