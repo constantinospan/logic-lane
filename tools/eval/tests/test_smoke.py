@@ -18,3 +18,8 @@ def test_the_code_reviewer_is_where_the_eval_expects_it():
     # The eval (E2b) runs this prompt with the settings in review.yml. If they move, the eval must move too.
     assert (REPO_ROOT / "tools" / "review" / "prompts" / "code.md").is_file()
     assert "code-review:" in (REPO_ROOT / ".github" / "workflows" / "review.yml").read_text(encoding="utf-8")
+
+
+def test_throwaway_break():
+    # Proof that a failing Python test turns CI red (CLAUDE.md "Changing CI"). Never merged.
+    assert 1 + 1 == 3
