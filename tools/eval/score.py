@@ -1,7 +1,7 @@
 """Scoring and the report for the eval (plan item E2b, decision D25).
 
-Learning mode: the owner writes `score_run` and `report` (marked YOUR PART below), from the outlines in their
-docstrings, until `uv run pytest tests/test_score.py -v` passes. Claude wrote the rest and reviews your part.
+Written by Claude (the owner chose automation over writing it, 2026-11-21). tests/test_score.py pins down
+exactly what each function must do.
 
 A "record" is one saved run (out/<time>/<case>-<run>.json), made by eval_review.py. The parts you need:
   record["case"]     the case id, e.g. "b01"
@@ -55,63 +55,84 @@ def cost(record: dict) -> dict:
             "seconds": float(record.get("seconds") or 0)}
 
 
-# ---------- YOUR PART 1 ----------
+# ---------- Scoring one run ----------
 
 def score_run(record: dict) -> dict:
-    """Score one run. Return a dict with these keys:
+    """Score one run. Returns:
 
       "case", "run", "hidden"   copied from the record
       "kind"                    record["expect"]["kind"]
-      "outcome"                 one of:
-         "error"        the record has an "error", or "review" is None or not a dict
-         "caught"       (bug or claim cases) a Blocking finding matches the planted problem: matches(...)
-         "missed"       (bug or claim cases) no Blocking finding matches
-         "clean"        (clean cases) no Blocking findings at all
-         "false alarm"  (clean cases) at least one Blocking finding
-      "weak"                    True only when the outcome is "missed" but a Suggestion matches (the reviewer
-                                noticed, but the PR would still pass). False otherwise.
-      "false_alarms"            clean cases: how many Blocking findings. Other cases: 0.
-      "extra"                   bug and claim cases: Blocking findings that are NOT part of the catch. For a bug
-                                case, a Blocking finding is part of the catch if it matches OR is in the planted
-                                file (in_file(finding, expect["file"])): one bug often gets several right
-                                findings. For a claim case, only matching counts. Clean and error runs: 0.
-      plus everything cost(record) returns ("cost_usd", "turns", "seconds")
-
-    Every result has all the keys above, error runs too: an error run still cost time and money.
-
-    Hints: start with the "error" check and return early (still with the cost keys). `review.get("blocking", [])` gives the list.
-    Python's `any(... for f in findings)` is True if any item passes, `sum(1 for f in findings if ...)` counts.
-    `{**a, **b}` merges two dicts.
+      "outcome"                 "error"        the run crashed, timed out, or gave no review
+                                "caught"       bug/claim case: a Blocking finding matches the planted problem
+                                "missed"       bug/claim case: no Blocking finding matches
+                                "clean"        clean case: no Blocking findings
+                                "false alarm"  clean case: at least one Blocking finding
+      "weak"                    missed, but a Suggestion matches (noticed, yet the PR would still pass)
+      "false_alarms"            clean cases: how many Blocking findings
+      "extra"                   bug/claim cases: Blocking findings that aren't part of the catch. On a bug case,
+                                a finding that matches OR points at the planted file is part of the catch (one
+                                bug often gets several right findings).
+      "cost_usd", "turns", "seconds"   from cost(record); error runs cost something too
     """
-    raise NotImplementedError("Your part: see the docstring, and tests/test_score.py")
+    expect = record["expect"]
+    result = {"case": record["case"], "run": record["run"], "hidden": record["hidden"], "kind": expect["kind"],
+              "weak": False, "false_alarms": 0, "extra": 0, **cost(record)}
+
+    review = record.get("review")
+    if record.get("error") or not isinstance(review, dict):
+        return {**result, "outcome": "error"}
+
+    blocking = review.get("blocking", [])
+    if expect["kind"] == "clean":
+        return {**result, "outcome": "false alarm" if blocking else "clean", "false_alarms": len(blocking)}
+
+    def part_of_the_catch(finding: dict) -> bool:
+        return matches(finding, expect) or (expect["kind"] == "bug" and in_file(finding, expect["file"]))
+
+    caught = any(matches(f, expect) for f in blocking)
+    weak = not caught and any(matches(f, expect) for f in review.get("suggestions", []))
+    extra = sum(1 for f in blocking if not part_of_the_catch(f))
+    return {**result, "outcome": "caught" if caught else "missed", "weak": weak, "extra": extra}
 
 
-# ---------- YOUR PART 2 ----------
+# ---------- The report ----------
+
+def _count(runs: list[dict], outcome: str) -> int:
+    return sum(1 for s in runs if s["outcome"] == outcome)
+
 
 def report(scored: list[dict], meta: dict) -> str:
-    """A short markdown report of a whole eval, from the score_run results. It must have:
+    """A short markdown report of a whole eval: a table per visible case, one combined line for the hidden cases
+    (counts only, never their ids, so nothing about a single hidden case leaks), and totals over every run."""
+    lines = ["## Eval report", "",
+             f"Claude Code: {meta['local_cli']} (GitHub: {meta['action_cli']})", "",
+             "| Case | Kind | Runs | Caught | Missed | Weak | False alarms | Errors |",
+             "|---|---|---|---|---|---|---|---|"]
 
-    1. A heading line: "## Eval report"
-    2. A line with the Claude versions: "Claude Code: <meta['local_cli']> (GitHub: <meta['action_cli']>)"
-    3. A table with one row per case that is NOT hidden, in case order:
-         | Case | Kind | Runs | Caught | Missed | Weak | False alarms | Errors |
-       - Runs: how many runs that case had.
-       - Caught / Missed / Errors: how many runs had that outcome.
-       - Weak: how many runs had weak = True.
-       - False alarms: the sum of "false_alarms" over its runs.
-    4. A "Hidden cases" line, counts only, never their ids: e.g.
-         "Hidden cases: 3 cases, 9 runs: 5 caught, 2 missed, 0 false alarms, 2 errors"
-       where "false alarms" is the sum of "false_alarms" (like the table), and the other counts are runs.
-       (one total for all hidden cases together, so nothing about a single hidden case leaks).
-    5. A "Totals" section with these lines, over ALL runs (hidden included):
-         "Bugs caught: X of Y runs (Z%)"           Y = bug and claim runs that aren't errors; Z rounded to a
-                                                   whole number, 0 if Y is 0
-         "False alarms on clean cases: N in M runs"   N = sum of false_alarms, M = clean runs that aren't errors
-         "Extra findings on bug cases: E"            sum of "extra"
-         "Errors: K of T runs"
-         "Cost: $C.CC, turns: U, time: V min"       sums; C with 2 decimals, V rounded to a whole number
+    by_case: dict[str, list[dict]] = {}
+    for s in scored:
+        by_case.setdefault(s["case"], []).append(s)
+    for case in sorted(by_case):
+        runs = by_case[case]
+        if runs[0]["hidden"]:
+            continue
+        lines.append(f"| {case} | {runs[0]['kind']} | {len(runs)} | {_count(runs, 'caught')} | "
+                     f"{_count(runs, 'missed')} | {sum(1 for s in runs if s['weak'])} | "
+                     f"{sum(s['false_alarms'] for s in runs)} | {_count(runs, 'error')} |")
 
-    Hints: build a list of lines and finish with "\\n".join(lines) + "\\n". A dict of lists, filled in a loop
-    (`by_case.setdefault(s["case"], []).append(s)`), groups runs by case. f"{x:.2f}" gives 2 decimals.
-    """
-    raise NotImplementedError("Your part: see the docstring, and tests/test_score.py")
+    hidden = [s for s in scored if s["hidden"]]
+    lines += ["", f"Hidden cases: {len({s['case'] for s in hidden})} cases, {len(hidden)} runs: "
+                  f"{_count(hidden, 'caught')} caught, {_count(hidden, 'missed')} missed, "
+                  f"{sum(s['false_alarms'] for s in hidden)} false alarms, {_count(hidden, 'error')} errors"]
+
+    bugs = [s for s in scored if s["kind"] != "clean" and s["outcome"] != "error"]
+    clean = [s for s in scored if s["kind"] == "clean" and s["outcome"] != "error"]
+    percent = round(100 * _count(bugs, "caught") / len(bugs)) if bugs else 0
+    lines += ["", "### Totals",
+              f"Bugs caught: {_count(bugs, 'caught')} of {len(bugs)} runs ({percent}%)",
+              f"False alarms on clean cases: {sum(s['false_alarms'] for s in clean)} in {len(clean)} runs",
+              f"Extra findings on bug cases: {sum(s['extra'] for s in scored)}",
+              f"Errors: {_count(scored, 'error')} of {len(scored)} runs",
+              f"Cost: ${sum(s['cost_usd'] for s in scored):.2f}, turns: {sum(s['turns'] for s in scored)}, "
+              f"time: {round(sum(s['seconds'] for s in scored) / 60)} min"]
+    return "\n".join(lines) + "\n"
