@@ -374,3 +374,27 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   stored only as a secret in the private repo. Not publishing anything was chosen after a review found that a public
   copy of raw logs would need a write key here, would grow by about 1 GB a year, and couldn't be proven free of
   personal details.
+
+### D25. Eval of the AI code reviewer (owner, 2026-11-15 to 2026-11-21, plan items E2a and E2b)
+- **What:** a fixed set of small changes (cases) on one base commit, some with a planted bug and some clean. A
+  Python tool runs the real code reviewer on each case 3 times and scores bugs caught, false alarms and cost. Code
+  reviewer only for now; the play reviewer may come later.
+- **Same as GitHub:** each run gets the same folders, inputs, prompt, result format and tool limits as the
+  `code-review` job in `review.yml` (read from that file, so they can't drift apart). It runs without the owner's
+  personal Claude settings, and records the model and Claude Code version, since the review job doesn't pin a model.
+- **Realistic cases:** every case passes `npm run check`, because the real review only runs after CI is green. Cases
+  only plant what the code reviewer owns (checklist §3 code items, §5, §6, bugs), and change nothing visible.
+  They're stored as data (`tools/eval/cases/`), never as live site files.
+- **Hidden cases** (`tools/eval/cases-hidden/`): kept out of the rule-fix agent's working folder (E2d), so it
+  can't teach to the test. How is decided when E2d is built, since this repo is public. The reviewer never sees any case's expected answer. Reports show hidden cases as counts only.
+- **Scoring:** caught = a Blocking finding about the planted bug. Only a Suggestion counts as missed, because the PR
+  would still pass. A run that crashes or doesn't finish is an error, not a miss (like D17's ⚠️). The headline false
+  alarm number is Blocking findings on clean cases. The owner can relabel any result by hand.
+- **Where it runs:** on the owner's Mac, by hand, with results kept locally (not committed). Automatic runs are E2c.
+- **Rule-fix PRs (E2d, owner 2026-11-21):** the rule-fix agent only pushes its branch. A plain script step in the
+  workflow, not the AI, then opens the PR, with an @mention of the owner and a `rule-fix` label. The AI never gets
+  permission to open PRs, and the owner always merges by hand. This is the one exception to D15's "Create PR link";
+  D15 and `CLAUDE.md` are updated when E2d is built.
+- **Packages:** pytest only (D23), plus the few packages pytest itself needs, all pinned exactly in
+  `tools/eval/uv.lock`. uv ignores releases newer than a fixed
+  date in `pyproject.toml`, the same "at least 2 weeks old" rule as for GitHub actions.

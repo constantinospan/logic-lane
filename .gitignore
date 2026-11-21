@@ -22,3 +22,9 @@ review-input/
 
 # Idea gate scratch folder (tools/idea)
 idea-input/
+
+# Python eval (tools/eval, D25): local environment and results, never committed
+tools/eval/.venv/
+tools/eval/out/
+__pycache__/
+.pytest_cache/
