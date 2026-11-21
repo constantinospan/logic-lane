@@ -160,7 +160,7 @@ def test_claude_command_matches_the_job_and_isolates(tmp_path):
     cmd = ev.claude_command(s, "PROMPT", "{}")
     assert cmd[:3] == ["claude", "-p", "PROMPT"]
     assert cmd[cmd.index("--allowedTools") + 1] == s["allowed"]
-    assert cmd[cmd.index("--disallowedTools") + 1] == s["disallowed"]
+    assert cmd[cmd.index("--disallowedTools") + 1] == ",".join([s["disallowed"], *ev.EXTRA_DENY])
     assert cmd[cmd.index("--setting-sources") + 1] == "project"
     assert "--strict-mcp-config" in cmd and "--no-session-persistence" in cmd
     deny = json.loads(cmd[cmd.index("--settings") + 1])["permissions"]["deny"]

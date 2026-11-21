@@ -412,7 +412,8 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   - daily, but only if something that decides the result changed: the agent rules, the code-review job, the
     eval's cases, or the model;
   - after the AI review on the owner's PRs that change what the code reviewer reads (after, so it never
-    competes with the real review for the Claude plan's limits);
+    competes with the real review for the Claude plan's limits; skipped when a ❌ starts a fix round, since the
+    fix commit gets its own eval);
   - and by hand.
   A "fingerprint" of the files' content and the model stands for "what changed"; a clean, complete eval is
   saved under it for 90 days.
@@ -426,7 +427,7 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 - **Results:**
   - On a PR, one comment with the PR's numbers and main's for comparison.
   - Daily and by-hand runs show the report on the run's page and keep it as a run file (90 days).
-  - Nothing is committed. Hidden cases only appear as combined numbers.
+  - Nothing is committed. Hidden cases only appear as combined numbers: job and file names use anonymous slots.
 - **Information only:** never a required check, and a low score never turns a run red. A run goes red only when
   reviews error or give no result, so GitHub emails the owner.
 - **60-day switch-off:** GitHub pauses scheduled workflows in a public repo after 60 days without activity. No

@@ -35,9 +35,13 @@ on:
 permissions: {} # every job asks for what it needs
 
 concurrency:
-  # One eval per PR branch (a newer push replaces it); main's (daily, by hand) never stops halfway. CI runs on
-  # main's own pushes land in the "pr-main" group and do nothing, so they never cancel main's eval.
-  group: eval-${{ github.event_name == 'workflow_run' && format('pr-{0}', github.event.workflow_run.head_branch) || 'main' }}
+  # One eval per PR branch of this repo (a newer push replaces it). Main's (daily, by hand) never stops halfway.
+  # Anything else that finishes CI (main's own pushes, fork PRs, manual CI runs) gets a group of its own, so it can
+  # never cancel a running eval.
+  group: >-
+    eval-${{ github.event_name != 'workflow_run' && 'main' ||
+    (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.head_repository.full_name == github.repository)
+    && format('pr-{0}', github.event.workflow_run.head_branch) || format('skip-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
 
 jobs:
@@ -56,7 +60,7 @@ jobs:
       pull-requests: read
       statuses: read
     outputs:
-      go: ${{ steps.what.outputs.go }}
+      go: ${{ steps.wait.outputs.skip == 'true' && 'false' || steps.what.outputs.go }}
       mode: ${{ steps.what.outputs.mode }}
       number: ${{ steps.what.outputs.number }}
       rules: ${{ steps.what.outputs.rules }}
@@ -64,6 +68,7 @@ jobs:
       cases: ${{ steps.what.outputs.cases }}
       runs: ${{ steps.what.outputs.runs }}
       matrix: ${{ steps.what.outputs.matrix }}
+      slots: ${{ steps.what.outputs.slots }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -85,12 +90,13 @@ jobs:
           set -euo pipefail
           echo "go=false" >> "$GITHUB_OUTPUT"
           main=$(git rev-parse HEAD)
-          cases=all runs=3 number=
+          cases=all runs=3 number='' rounds=0
           case "$EVENT" in
             schedule) mode=daily rules=$main ;;
             workflow_dispatch)
               mode=hand cases=${IN_CASES:-all} runs=${IN_RUNS:-3}
               [[ "$cases" =~ ^[a-z0-9,\ ]+$ && "$runs" =~ ^[1-9]$ ]] || { echo "::error::Bad cases or runs input."; exit 1; }
+              git fetch -q origin "$IN_RULES" 2>/dev/null || true # a commit that's only on a PR ref
               rules=$(git rev-parse --verify -q "origin/${IN_RULES}^{commit}" || git rev-parse --verify "${IN_RULES}^{commit}")
               ;;
             workflow_run)
@@ -103,48 +109,60 @@ jobs:
                 echo "::notice::No single open PR by the owner at this commit, no eval."; exit 0
               fi
               number=$(jq -r '.[0].number' <<<"$prs")
+              rounds=$(jq '[.[0].labels[].name | select(. == "ai-fix-1" or . == "ai-fix-2")] | length' <<<"$prs")
               changed=$(gh api "repos/${REPO}/pulls/${number}/files" --paginate --jq '.[].filename')
               if [ "$(python3 tools/eval/ci_eval.py trigger <<<"$changed")" != true ]; then
                 echo "::notice::The PR doesn't change what the code reviewer reads, no eval."; exit 0
               fi
               ;;
           esac
-          matrix=$(cd tools/eval && python3 ci_eval.py matrix --cases "$cases" --runs "$runs")
+          (cd tools/eval && python3 ci_eval.py slots --cases "$cases" --runs "$runs" --out "$RUNNER_TEMP/slots.json")
           {
-            echo "mode=$mode"; echo "number=$number"; echo "rules=$rules"; echo "main=$main"
-            echo "cases=$cases"; echo "runs=$runs"; echo "matrix=$matrix"; echo "go=true"
+            echo "mode=$mode"; echo "number=$number"; echo "rounds=$rounds"; echo "rules=$rules"; echo "main=$main"
+            echo "cases=$cases"; echo "runs=$runs"; echo "go=true"
+            echo "matrix=$(jq -c .matrix "$RUNNER_TEMP/slots.json")"; echo "slots=$(jq -c .slots "$RUNNER_TEMP/slots.json")"
           } >> "$GITHUB_OUTPUT"
           echo "Eval: $mode, rules $rules, cases $cases, $runs run(s) each" >> "$GITHUB_STEP_SUMMARY"
       # After the real review, not alongside it, so the eval never competes with it for the Claude plan's limits.
+      # And when a ❌ starts an automatic fix round (D17), skip: the fix pushes a new commit, which gets its own eval.
       - name: Wait for the AI review
+        id: wait
         if: ${{ steps.what.outputs.mode == 'pr' && vars.AI_REVIEW == 'on' }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.event.workflow_run.head_sha }}
+          AI_FIX: ${{ vars.AI_FIX }}
+          ROUNDS: ${{ steps.what.outputs.rounds }}
         run: |
           for _ in $(seq 1 90); do
             state=$(gh api "repos/${REPO}/commits/${SHA}/statuses" --jq '[.[] | select(.context == "ai-review")][0].state // "none"' || echo none)
-            if [ "$state" != none ] && [ "$state" != pending ]; then echo "AI review: $state"; exit 0; fi
+            if [ "$state" != none ] && [ "$state" != pending ]; then
+              echo "AI review: $state"
+              if [ "$state" = failure ] && [ "$AI_FIX" = on ] && [ "${ROUNDS:-0}" -lt 2 ]; then
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+                echo "A fix round is coming; its commit gets its own eval." >> "$GITHUB_STEP_SUMMARY"
+              fi
+              exit 0
+            fi
             sleep 30
           done
           echo "::notice::The AI review hasn't finished after 45 minutes. Going ahead."
       - name: Run folders, without any answers
-        if: ${{ steps.what.outputs.go == 'true' }}
+        if: ${{ steps.what.outputs.go == 'true' && steps.wait.outputs.skip != 'true' }}
         env:
           RULES: ${{ steps.what.outputs.rules }}
           MAIN: ${{ steps.what.outputs.main }}
-          CASES: ${{ steps.what.outputs.cases }}
         run: |
           set -euo pipefail
           git fetch -q origin "$RULES" 2>/dev/null || true # a PR head that isn't on a branch yet
-          python3 tools/eval/ci_eval.py prepare --rules "$RULES" --main "$MAIN" --cases "$CASES" --out "$RUNNER_TEMP/cases"
+          python3 tools/eval/ci_eval.py prepare --rules "$RULES" --main "$MAIN" --slots "$RUNNER_TEMP/slots.json" --out "$RUNNER_TEMP/cases"
           mkdir "$RUNNER_TEMP/up"
           for d in "$RUNNER_TEMP"/cases/*/; do
             id=$(basename "$d")
             tar -czf "$RUNNER_TEMP/up/$id.tgz" -C "$d" .
           done
-      - if: ${{ steps.what.outputs.go == 'true' }}
+      - if: ${{ steps.what.outputs.go == 'true' && steps.wait.outputs.skip != 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: case-folders
@@ -197,7 +215,8 @@ jobs:
           EXEC: ${{ steps.claude.outputs.execution_file }}
         run: |
           model=$(jq -r '[.[] | select(.type == "system" and .subtype == "init")][0].model // empty' "$EXEC")
-          [[ "$model" =~ ^[A-Za-z0-9._:\[\]-]+$ ]] || { echo "::error::No model in the probe's result."; exit 1; }
+          re='^[][A-Za-z0-9._:-]+$' # plain characters, plus [ ] as in claude-opus-5-5[1m]
+          [[ $model =~ $re ]] || { echo "::error::No model in the probe's result."; exit 1; }
           echo "model=$model" >> "$GITHUB_OUTPUT"
           echo "Model: $model" >> "$GITHUB_STEP_SUMMARY"
 
@@ -216,7 +235,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ needs.plan.outputs.main }}
           fetch-depth: 0
           persist-credentials: false
       - id: fp
@@ -248,7 +267,7 @@ jobs:
   review:
     needs: [plan, decide]
     if: ${{ needs.decide.outputs.run == 'true' }}
-    name: review ${{ matrix.case }}-${{ matrix.run }}
+    name: review ${{ matrix.slot }} # an anonymous slot: hidden cases only appear as combined numbers
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -271,11 +290,11 @@ jobs:
       - name: The run folder
         id: run
         env:
-          CASE: ${{ matrix.case }}
+          FOLDER: ${{ fromJSON(needs.plan.outputs.slots)[matrix.slot].folder }}
         run: |
           set -euo pipefail
           mkdir "$RUNNER_TEMP/case"
-          tar -xzf "$RUNNER_TEMP/dl/${CASE}.tgz" -C "$RUNNER_TEMP/case"
+          tar -xzf "$RUNNER_TEMP/dl/${FOLDER}.tgz" -C "$RUNNER_TEMP/case"
           rm -rf "$RUNNER_TEMP/dl" # other cases' folders
           cp -a "$RUNNER_TEMP/case/work/." "$GITHUB_WORKSPACE/"
           # The root is a git checkout of main in the real job; here a one-commit repo of the same files.
@@ -284,6 +303,8 @@ jobs:
           git add -A
           git -c user.name=eval -c user.email=noreply@example.invalid commit -q -m main
           sha256sum CLAUDE.md > "$RUNNER_TEMP/claude-md.sha"
+          # The code-review job's env from the rules commit's review.yml (only CLAUDE_CODE_* names, checked by ci_eval.py).
+          jq -r '.env | to_entries[] | "\(.key)=\(.value)"' "$RUNNER_TEMP/case/run.json" >> "$GITHUB_ENV"
           {
             echo "prompt<<EOF_PROMPT"; jq -r .prompt "$RUNNER_TEMP/case/run.json"; echo "EOF_PROMPT"
             echo "claude_args<<EOF_ARGS"; jq -r .claude_args "$RUNNER_TEMP/case/run.json"; echo "EOF_ARGS"
@@ -323,9 +344,9 @@ jobs:
       - if: ${{ always() && steps.claude.outputs.execution_file != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: run-${{ matrix.case }}-${{ matrix.run }}
+          name: run-${{ matrix.slot }}
           path: ${{ runner.temp }}/out/saved.json
-          retention-days: 7
+          retention-days: 1
 
   report:
     needs: [plan, decide, review]
@@ -348,14 +369,17 @@ jobs:
       - name: Score
         id: score
         env:
-          MATRIX: ${{ needs.plan.outputs.matrix }}
+          SLOTS: ${{ needs.plan.outputs.slots }}
           FP: ${{ needs.decide.outputs.fingerprint }}
         run: |
-          mkdir -p "$RUNNER_TEMP/runs"
+          mkdir -p "$RUNNER_TEMP/runs" "$RUNNER_TEMP/result"
+          printf '%s' "$SLOTS" | jq '{slots: .}' > "$RUNNER_TEMP/slots.json"
           cd tools/eval
-          if python3 ci_eval.py report --runs "$RUNNER_TEMP/runs" --matrix "$MATRIX" --out "$RUNNER_TEMP/result" \
+          if python3 ci_eval.py report --runs "$RUNNER_TEMP/runs" --slots "$RUNNER_TEMP/slots.json" --out "$RUNNER_TEMP/result" \
                --action "claude-code-action v1.0.265" > /dev/null; then errors=0; else errors=1; fi
-          rm -f "$RUNNER_TEMP/result/scored.json" # per run, so it would name the hidden cases
+          if [ ! -s "$RUNNER_TEMP/result/report.md" ]; then
+            printf '## Eval report\n\nThe scoring script failed, so there are no numbers. See the run.\n' > "$RUNNER_TEMP/result/report.md"
+          fi
           echo "$FP" > "$RUNNER_TEMP/result/fingerprint"
           cat "$RUNNER_TEMP/result/report.md" >> "$GITHUB_STEP_SUMMARY"
           echo "errors=$errors" >> "$GITHUB_OUTPUT"

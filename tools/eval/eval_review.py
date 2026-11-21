@@ -44,6 +44,10 @@ RULE_PATHS = ["CLAUDE.md", ".claude", "docs/REVIEW-CHECKLIST.md", "docs/DECISION
 # Claude Code loads these from the root and runs hooks as commands next to the login token, so they always come from
 # a trusted commit (main on GitHub), never from the rules being tested. Changes to them aren't evaluated.
 TRUSTED_PATHS = [".claude/settings.json", ".claude/settings.local.json", ".claude/hooks", ".mcp.json"]
+# Denied on top of the job's own list. The job's allow-list already leaves them out, so nothing changes for the
+# review; this only makes sure agents, skills or commands from the rules being tested (which can carry hooks) can
+# never be started.
+EXTRA_DENY = ["Task", "Agent", "Skill", "SlashCommand"]
 # git for building run folders: none of the owner's own git settings, which could change diffs or commits.
 GIT_ENV = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "en_US.UTF-8",
            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"}
@@ -222,7 +226,7 @@ def build_run_folder(root: Path, rules_commit: str, base: str, case: dict, trust
             shutil.copy2(source, target)
     git("add", "-A", ".", cwd=pr)  # pr/ holds only BASE's files and these
     if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=pr, env=GIT_ENV).returncode:
-        git(*bot, "commit", "-q", "-m", "Agent rules as on main", cwd=pr)
+        git(*bot, "commit", "-q", "-m", "Update agent rules", cwd=pr)
     git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=pr)
     git("checkout", "-q", "-b", case["branch"], cwd=pr)
     git("apply", "--index", str(case["dir"] / "change.patch"), cwd=pr)
@@ -269,7 +273,7 @@ def claude_command(settings: dict, prompt: str, schema: str) -> list[str]:
             "--max-turns", str(settings["max_turns"]),
             "--json-schema", schema,
             "--allowedTools", settings["allowed"],
-            "--disallowedTools", settings["disallowed"],
+            "--disallowedTools", ",".join([settings["disallowed"], *EXTRA_DENY]),
             "--output-format", "json",
             "--setting-sources", "project",
             "--settings", json.dumps(deny),
