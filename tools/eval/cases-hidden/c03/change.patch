@@ -1,0 +1,59 @@
+diff --git a/js/core/storage.js b/js/core/storage.js
+index 7b6113b..13d627b 100644
+--- a/js/core/storage.js
++++ b/js/core/storage.js
+@@ -61,6 +61,24 @@ function browserBackend() {
+   }
+ }
+ 
++/**
++ * Does a loaded save point at a real puzzle? A damaged save (e.g. edited by hand, or written by a much older version)
++ * could otherwise reach the game with no level or seed.
++ * @param {ResumeRecord} record
++ * @returns {boolean}
++ */
++function isPosition(record) {
++  return (
++    typeof record.gameId === 'string' &&
++    Number.isInteger(record.level) &&
++    record.level >= 1 &&
++    Number.isInteger(record.n) &&
++    record.n >= 0 &&
++    typeof record.seed === 'string' &&
++    record.seed !== ''
++  );
++}
++
+ /**
+  * @param {{ backend?: Backend | null, now?: () => number }} [options]  Injectable for tests. `backend: null` means
+  *   "no usable browser storage", which falls back to memory.
+@@ -112,6 +130,7 @@ export function createStore(options = {}) {
+       const fresh =
+         record !== null &&
+         typeof record === 'object' &&
++        isPosition(record) &&
+         typeof record.savedAt === 'number' &&
+         now() - record.savedAt < RESUME_WINDOW_MS &&
+         record.savedAt <= now() + 60_000 && // clock moved backwards a lot: treat as stale
+diff --git a/tests/unit/storage.test.js b/tests/unit/storage.test.js
+index 9ded964..0dc7359 100644
+--- a/tests/unit/storage.test.js
++++ b/tests/unit/storage.test.js
+@@ -67,6 +67,17 @@ describe('storage', () => {
+     expect(store.load(versionOf)).toBeNull();
+   });
+ 
++  it('drops a damaged save that has no real level, puzzle number or seed', () => {
++    for (const broken of [{ level: undefined }, { level: 0 }, { level: 2.5 }, { level: '3' }, { n: -1 }, { n: null },
++      { seed: '' }, { seed: 42 }, { gameId: 7 }]) {
++      store.save({ ...record, ...broken });
++      expect(store.load(versionOf), JSON.stringify(broken)).toBeNull();
++      expect(backend.map.has(RESUME_KEY)).toBe(false);
++    }
++    store.save(record);
++    expect(store.load(versionOf)).not.toBeNull();
++  });
++
+   it('returns nothing when nothing was saved', () => {
+     expect(store.load(versionOf)).toBeNull();
+   });

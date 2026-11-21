@@ -1,0 +1,21 @@
+{
+  "id": "b01",
+  "number": 901,
+  "title": "Demo: remember the best streak",
+  "body": "The hidden demo game now keeps a streak: puzzles she gets right first time, in a row, and her best run so far.\n\n## What changed\n- `games/demo/game.js`: after each puzzle the demo updates the current run (right first time adds one, a wrong tap first starts again from 0) and the best run.\n- When she's on a new best of 3 or more, 🔊 reads \"3 in a row! Tap the same picture.\" instead of the usual instruction. Nothing new shows on screen.\n- If the browser blocks storage or it's full, the streak just isn't kept and the game plays as before.\n\n## How to try it\n`node tests/serve.mjs`, open `http://localhost:4173/logic-lane/`#/game/demo, pick Easy, tap the right picture 3 times, then tap 🔊 on the 4th puzzle.\n\n## Checks\n- Local `npm run check`: type check passed, 378 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-901-demo-best-streak",
+  "expect": {
+    "kind": "bug",
+    "file": "games/demo/game.js",
+    "match": [
+      "localstorage",
+      "storage module",
+      "savestate",
+      "storage.js",
+      "long-term",
+      "progress",
+      "d7"
+    ]
+  },
+  "why": "Games must save only through api.saveState / js/core/storage.js and never touch localStorage (CLAUDE.md, GAME-API, checklist §5), and a best streak kept forever is long-term progress, which D7 rules out."
+}

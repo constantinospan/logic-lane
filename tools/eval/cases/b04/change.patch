@@ -1,0 +1,16 @@
+diff --git a/sw.js b/sw.js
+index 94e31c7..4493511 100644
+--- a/sw.js
++++ b/sw.js
+@@ -84,7 +84,10 @@ async function cacheFirst(request) {
+     const page = await cache.match('./index.html');
+     if (page) return page;
+   }
+-  return fetch(request);
++  // Not in the cache (e.g. a file PRECACHE missed): keep a copy, so it works offline next time too.
++  const response = await fetch(request);
++  await cache.put(request, response.clone());
++  return response;
+ }
+ 
+ /** @param {Request} request */

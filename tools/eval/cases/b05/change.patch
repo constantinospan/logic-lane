@@ -1,0 +1,48 @@
+diff --git a/js/pwa/update.js b/js/pwa/update.js
+index 51ea9ca..89f6f98 100644
+--- a/js/pwa/update.js
++++ b/js/pwa/update.js
+@@ -20,20 +20,32 @@ export function registerServiceWorker() {
+     location.reload(); // the new version is in control; resume brings her back to the same puzzle
+   });
+ 
++  /** @param {ServiceWorkerRegistration} reg */
++  const registered = (reg) => {
++    registration = reg;
++    if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner(reg.waiting);
++    reg.addEventListener('updatefound', () => {
++      const worker = reg.installing;
++      worker?.addEventListener('statechange', () => {
++        if (worker.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner(worker);
++      });
++    });
++  };
++
+   navigator.serviceWorker
+     .register('./sw.js')
+-    .then((reg) => {
+-      registration = reg;
+-      if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner(reg.waiting);
+-      reg.addEventListener('updatefound', () => {
+-        const worker = reg.installing;
+-        worker?.addEventListener('statechange', () => {
+-          if (worker.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner(worker);
+-        });
+-      });
+-    })
++    .then(registered)
+     .catch(() => {
+-      /* no offline support this time; the app still works online */
++      // The first try can fail on a weak connection (the very first visit on the tablet). Try once more a little
++      // later, so the app still becomes ready for offline.
++      setTimeout(() => {
++        navigator.serviceWorker
++          .register('/sw.js')
++          .then(registered)
++          .catch(() => {
++            /* no offline support this time; the app still works online */
++          });
++      }, 5000);
+     });
+ 
+   // iOS rarely relaunches an installed app, so check for updates whenever it comes back to the front.

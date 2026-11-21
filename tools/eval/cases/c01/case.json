@@ -1,0 +1,11 @@
+{
+  "id": "c01",
+  "number": 909,
+  "title": "Arrow Path: one helper for the 🔁 picture",
+  "body": "A small tidy-up in Arrow Path's screen code. Nothing changes in how the game looks or plays.\n\n## What changed\n- `games/arrow-path/view.js`: the 🔁 picture with its ×2 or ×3 count was built in two places (the move slots and the keys) with the same 5 lines. It's now one small `loopIcon` function, used by both. The elements, their classes and the labels screen readers hear are exactly the same as before.\n\n## How to try it\n`node tests/serve.mjs`, open `http://localhost:4173/logic-lane/`, Arrow Path → Medium, and play up to level 14 (or long-press the level to check it): the 🔁×2 and 🔁×3 keys and slots look and work as before.\n\n## Checks\n- The Arrow Path browser tests and accessibility checks cover the 🔁 keys and slots.\n- Local `npm run check`: type check passed, 378 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-909-loop-icon-helper",
+  "expect": {
+    "kind": "clean"
+  },
+  "why": "A pure refactor inside a game's view: same DOM, classes and aria-labels, JSDoc-typed helper, no logic, storage, path, input or generator change."
+}

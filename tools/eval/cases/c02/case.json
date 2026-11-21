@@ -1,0 +1,11 @@
+{
+  "id": "c02",
+  "number": 910,
+  "title": "Arrow Path: only bring back saved arrows on real squares",
+  "body": "When a board puzzle resumes, `restoreArrows` brings back the arrows she had placed, and drops any that don't make sense. It still let through odd keys like `\"1.5,2\"` or `\"01,2\"`, which aren't real squares. They were never drawn or walked on, but they stayed in the save.\n\n## What changed\n- `games/arrow-path/view.js`: a saved arrow is only kept if its key is exactly a whole-number square, written the way the game writes it (`\"row,col\"`).\n- `tests/unit/games/arrow-path.test.js`: the existing resume test now also checks keys like `\"1.5,2\"`, `\"01,2\"`, `\" 1,2\"` and `\"1,2,0\"` are dropped, while a normal one is kept.\n\n## How to try it\n`node tests/serve.mjs`, open `http://localhost:4173/logic-lane/`, Arrow Path → Easy, put an arrow down and reload: it's still there.\n\n## Checks\n- The new checks are inside an existing test, so the test count doesn't change.\n- Local `npm run check`: type check passed, 378 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-910-restore-real-squares",
+  "expect": {
+    "kind": "clean"
+  },
+  "why": "A small, correct input-validation fix in the resume path with a matching unit test; the puzzle and generator are untouched, so no version bump is needed."
+}

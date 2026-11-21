@@ -1,0 +1,42 @@
+diff --git a/js/ui/dom.js b/js/ui/dom.js
+index 82fc424..433ee1e 100644
+--- a/js/ui/dom.js
++++ b/js/ui/dom.js
+@@ -21,6 +21,8 @@ export function h(tag, options = {}, children = []) {
+ /**
+  * Call `onDone` after the element is pressed and held for `ms`. Shows progress via the CSS variable
+  * --hold (0 → 1). Lifting the finger, moving off, or the system cancelling the touch all abort it.
++ * Uses touch and mouse events: on the iPad, Safari cancels a long pointer press when it decides the finger is
++ * scrolling, so a 3-second hold sometimes stopped by itself.
+  * @param {HTMLElement} el
+  * @param {number} ms
+  * @param {() => void} onDone
+@@ -49,19 +51,22 @@ export function onHold(el, ms, onDone) {
+     }
+   };
+ 
+-  /** @param {PointerEvent} e */
++  /** @param {MouseEvent | TouchEvent} e */
+   const down = (e) => {
+-    if (e.button !== 0) return;
++    if ('button' in e && e.button !== 0) return;
++    if (frame !== undefined) return; // already holding (a touch is followed by a mouse event)
+     start = performance.now();
+     el.classList.add('holding');
+     frame = requestAnimationFrame(tick);
+   };
+ 
+-  el.addEventListener('pointerdown', down);
+-  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) el.addEventListener(type, reset);
++  const starts = ['touchstart', 'mousedown'];
++  const ends = ['touchend', 'touchcancel', 'mouseup', 'mouseleave'];
++  for (const type of starts) el.addEventListener(type, /** @type {EventListener} */ (down), { passive: true });
++  for (const type of ends) el.addEventListener(type, reset);
+   return () => {
+     reset();
+-    el.removeEventListener('pointerdown', down);
+-    for (const type of ['pointerup', 'pointerleave', 'pointercancel']) el.removeEventListener(type, reset);
++    for (const type of starts) el.removeEventListener(type, /** @type {EventListener} */ (down));
++    for (const type of ends) el.removeEventListener(type, reset);
+   };
+ }

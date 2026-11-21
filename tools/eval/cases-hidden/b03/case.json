@@ -1,0 +1,21 @@
+{
+  "id": "b03",
+  "number": 903,
+  "title": "Demo: mix up the pictures after a wrong tap",
+  "body": "After a wrong tap in the demo game, it's easy to just tap the next picture along the row. Now the pictures swap places after a mistake, so she has to look again.\n\n## What changed\n- `games/demo/game.js`: after a wrong tap the picture still wiggles and 🔊 still gives the gentle hint (\"Try again. Find the star.\"), and then the choice buttons are put in a new order.\n- Which pictures are shown and which one is the answer don't change, so `createPuzzle` is untouched and the game's `version` stays 1.\n\n## How to try it\n`node tests/serve.mjs`, open `http://localhost:4173/logic-lane/`#/game/demo, pick Hard (most pictures), and tap a wrong picture.\n\n## Checks\n- Local `npm run check`: type check passed, 378 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-903-demo-mix-up",
+  "expect": {
+    "kind": "bug",
+    "file": "games/demo/game.js",
+    "match": [
+      "math.random",
+      "seed",
+      "seeded",
+      "rng",
+      "reproducib",
+      "same layout",
+      "deterministic"
+    ]
+  },
+  "why": "D12 and checklist §1/§3: the layout must come from the seeded rng so a reload or a bug-report seed shows the same puzzle; Math.random reorders the choices, so after a reload the layout differs from what she saw."
+}

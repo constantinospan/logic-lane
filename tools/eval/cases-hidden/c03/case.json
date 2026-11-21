@@ -1,0 +1,11 @@
+{
+  "id": "c03",
+  "number": 911,
+  "title": "Saving: ignore a damaged save instead of loading it",
+  "body": "The storage module already ignores a save that's too old, from another game version, or not valid JSON. A save with valid JSON but missing parts (no level, a level of 0, no seed) still got through, and the game would then start with no puzzle to build.\n\n## What changed\n- `js/core/storage.js`: `load()` now also checks the save points at a real puzzle: a game id, a whole-number level from 1, a whole-number puzzle count from 0, and a seed. If not, it's treated like a stale save: removed, and she starts fresh.\n- New unit test in `tests/unit/storage.test.js`: each kind of damaged save is dropped and removed, and a normal save still loads.\n\n## How to try it\n`node tests/serve.mjs`, open `http://localhost:4173/logic-lane/`, start the demo, press 🏠, then in DevTools change `level` in `logic-lane:resume` to `0` and reload: the home screen shows, and the demo's picker has no Continue.\n\n## Checks\n- `js/core/storage.js` stays at 100% line coverage.\n- Local `npm run check`: type check passed, 379 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-911-check-save-shape",
+  "expect": {
+    "kind": "clean"
+  },
+  "why": "Logic stays inside the storage module, uses the existing stale-save path (removes only the logic-lane:resume key), keeps the 3-hour and version checks unchanged, and comes with a unit test."
+}

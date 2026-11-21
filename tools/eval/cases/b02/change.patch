@@ -1,0 +1,59 @@
+diff --git a/js/core/storage.js b/js/core/storage.js
+index 7b6113b..4e0fbe3 100644
+--- a/js/core/storage.js
++++ b/js/core/storage.js
+@@ -78,9 +78,16 @@ export function createStore(options = {}) {
+     }
+   };
+ 
++  // The last record written, so saving the same thing again (each new screen, each time the app is hidden) doesn't
++  // write to storage again. Fewer writes on the tablet, and less chance of hitting a full store.
++  let lastSaved = '';
++
+   return {
+     /** @param {ResumeRecord} record */
+     save(record) {
++      const body = JSON.stringify(record);
++      if (body === lastSaved) return; // nothing changed
++      lastSaved = body;
+       const value = JSON.stringify({ ...record, savedAt: now() });
+       try {
+         backend.setItem(RESUME_KEY, value);
+@@ -124,11 +131,13 @@ export function createStore(options = {}) {
+     },
+ 
+     clear() {
++      lastSaved = '';
+       safely(() => backend.removeItem(RESUME_KEY));
+     },
+ 
+     /** Emergency reset: removes every logic-lane key, and nothing else. */
+     clearAll() {
++      lastSaved = '';
+       safely(() => {
+         for (const key of backend.keys()) if (key.startsWith(PREFIX)) backend.removeItem(key);
+       });
+diff --git a/tests/unit/storage.test.js b/tests/unit/storage.test.js
+index 9ded964..4799c23 100644
+--- a/tests/unit/storage.test.js
++++ b/tests/unit/storage.test.js
+@@ -33,6 +33,19 @@ describe('storage', () => {
+     expect(store.load(versionOf)).toMatchObject({ level: 3, seed: 'aaaaaa', state: { wrong: 2 } });
+   });
+ 
++  it('does not write again when nothing changed', () => {
++    let writes = 0;
++    const counting = createStore({ backend: { ...backend, setItem: (k, v) => { writes += 1; backend.setItem(k, v); } } });
++    counting.save(record);
++    counting.save({ ...record });
++    expect(writes).toBe(1);
++    counting.save({ ...record, state: { wrong: 3 } });
++    expect(writes).toBe(2);
++    counting.clear();
++    counting.save(record);
++    expect(writes).toBe(3);
++  });
++
+   it('only ever writes keys starting with logic-lane:', () => {
+     store.save(record);
+     expect([...backend.map.keys()]).toEqual([RESUME_KEY]);

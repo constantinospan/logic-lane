@@ -1,0 +1,21 @@
+{
+  "id": "b07",
+  "number": 907,
+  "title": "Hold to reset: keep holding on the iPad",
+  "body": "Holding the home title for the parent-only reset sometimes stopped by itself on the iPad before the 3 seconds were up. Safari can cancel a long press when it decides the finger is starting to scroll.\n\n## What changed\n- `js/ui/dom.js`: `onHold` now listens for touch events on touch screens and mouse events on desktop, which Safari doesn't cancel this way. A touch followed by the browser's own mouse event counts as one press.\n- This is the shared hold helper, so it covers all three holds: the home title (3 s), the Reset button (3 s), and the long press on the level indicator that shows the seed.\n\n## How to try it\n`node tests/serve.mjs`, open `http://localhost:4173/logic-lane/`, hold the \"Logic Lane\" title for 3 seconds, then hold Reset. Also try it with touch emulation in DevTools.\n\n## Checks\n- The hold tests (`tests/e2e/holds.spec.js`) pass at all three sizes, including tablet on WebKit.\n- Local `npm run check`: type check passed, 378 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-907-hold-ipad",
+  "expect": {
+    "kind": "bug",
+    "file": "js/ui/dom.js",
+    "match": [
+      "pointer",
+      "touchstart",
+      "mousedown",
+      "touch and mouse",
+      "touch events",
+      "mouse events",
+      "pointerdown"
+    ]
+  },
+  "why": "CLAUDE.md and D9: input uses pointer events only, so touch and mouse share one code path; this replaces them with separate touch and mouse listeners."
+}

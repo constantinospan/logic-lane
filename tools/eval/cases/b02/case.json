@@ -1,0 +1,22 @@
+{
+  "id": "b02",
+  "number": 902,
+  "title": "Storage: skip writing a save that hasn't changed",
+  "body": "The app writes the resume save very often: on every new puzzle screen, every time the app is hidden, and when it's closed. Most of those writes store exactly the same record as the time before.\n\n## What changed\n- `js/core/storage.js`: the store remembers the last record it wrote, and `save()` skips the write when the record is the same. Fewer writes on the tablet, and less chance of running into a full store.\n- `clear()` and `clearAll()` forget it, so the next save after them always writes.\n- New unit test in `tests/unit/storage.test.js`: saving the same record twice writes once, a changed record writes again, and a save after `clear()` writes again.\n\n## How to try it\n`node tests/serve.mjs`, open `http://localhost:4173/logic-lane/`, start the demo, and watch `logic-lane:resume` in DevTools → Application → Local Storage while switching tabs. The game plays exactly as before.\n\n## Checks\n- Local `npm run check`: type check passed, 379 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-902-skip-same-save",
+  "expect": {
+    "kind": "bug",
+    "file": "js/core/storage.js",
+    "match": [
+      "savedat",
+      "3-hour",
+      "3 hours",
+      "resume window",
+      "timestamp",
+      "pagehide",
+      "visibilitychange",
+      "expire"
+    ]
+  },
+  "why": "D7: the 3-hour window counts from the last save and saves also happen when the app is hidden; skipping unchanged records means the hide/pagehide saves no longer refresh savedAt, so resume expires 3 hours after her last move (and a re-save after load() dropped a stale record is skipped)."
+}

@@ -1,0 +1,32 @@
+diff --git a/games/demo/game.js b/games/demo/game.js
+index 12319f4..1ec4bec 100644
+--- a/games/demo/game.js
++++ b/games/demo/game.js
+@@ -15,6 +15,19 @@ const THINGS = [
+   { emoji: '⚽', word: 'ball' },
+ ];
+ 
++/**
++ * Put the buttons in a new order, so after a mistake she looks at the pictures again instead of tapping the next one.
++ * @param {HTMLElement} grid
++ */
++function mixUp(grid) {
++  const buttons = [...grid.children];
++  for (let i = buttons.length - 1; i > 0; i--) {
++    const j = Math.floor(Math.random() * (i + 1));
++    [buttons[i], buttons[j]] = [buttons[j], buttons[i]];
++  }
++  grid.replaceChildren(...buttons);
++}
++
+ /**
+  * @typedef {object} DemoPuzzle
+  * @property {Thing} target
+@@ -72,6 +85,7 @@ const demo = {
+           button.classList.remove('wiggle');
+           void button.offsetWidth; // restart the animation
+           button.classList.add('wiggle');
++          mixUp(grid);
+         }
+       });
+       grid.append(button);

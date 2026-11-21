@@ -1,0 +1,5 @@
+Type check (npm run typecheck): passed
+ Test Files  18 passed (18)
+      Tests  378 passed (378)
+  39 skipped
+  183 passed (32.0s)
