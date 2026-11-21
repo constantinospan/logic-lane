@@ -345,3 +345,32 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   bigger board, 2026-11-15). The trail stays after a wrong walk, until she presses Go again or changes the list.
 - **Generator:** the route comes first, then the puzzle around it, checked by solvers. If 500 tries all fail (never
   seen in tests), a fixed simple puzzle is used, so endless play never breaks.
+
+### D23. Python for offline tools only (owner, 2026-11-21)
+- Python may be used for tools that run outside the site: collecting data, evals, reports. It's never shipped, never
+  loaded by the site and never part of the site's build (D8, D9 are unchanged: the site stays plain JS, HTML, CSS).
+- E1's collector uses only Python's built-in library, with `unittest` for tests. No packages.
+- E2 may add **pytest**, pinned with **uv** (owner approved, 2026-11-15). Any other package needs the owner's OK, as
+  for npm.
+- Why: the owner is learning Python with these tools (learning mode: Claude writes most of it and explains it, the
+  owner writes small pieces).
+
+### D24. Private archive of the AI pipeline's history (owner, 2026-11-16 to 2026-11-21, plan item E1)
+- **Where:** a private repo, `constantinospan/logic-lane-archive`. It holds the raw copy and the collector that
+  makes it, never the game's code, so D1 is unchanged. GitHub user names and full logs stay in the raw data because
+  it's private; nothing from it is ever published or copied into this repo (D18).
+- **What:** every Actions run of this repo (all workflows, every attempt) with its full log, and every issue and PR
+  with comments, events, labels, commits, files, reviews and review comments. Not artifacts (screenshots, test
+  reports), which GitHub deletes after 14 days.
+- **How:** a scheduled workflow in the private repo, plus a manual button. Daily for now, weekly after 2026-12-20
+  (owner chose weekly over monthly, 2026-11-21: a log that fails to download gets several more tries before GitHub
+  deletes it at 90 days). It saves first, then goes red (GitHub emails the owner) if a log GitHub should still have
+  is missing, or something failed to download. Its bot commits straight to the private repo's `main` (data only, no
+  review needed there; CLAUDE.md's "never push to `main`" rule is about this repo).
+- **Nothing new in this repo:** no cross-repo trigger, no GitHub App, no `repository_dispatch`. Rule and agent
+  changes come in bursts and nothing reacts in real time, so a schedule within the 90 days is enough.
+- **Token:** reading logs needs sign-in, and the private repo's own token can't read another repo. So it uses a
+  fine-grained personal token, limited to this repo, read-only (Actions, Issues, Pull requests), renewed yearly,
+  stored only as a secret in the private repo. Not publishing anything was chosen after a review found that a public
+  copy of raw logs would need a write key here, would grow by about 1 GB a year, and couldn't be proven free of
+  personal details.
