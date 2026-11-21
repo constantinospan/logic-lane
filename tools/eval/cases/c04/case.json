@@ -1,0 +1,11 @@
+{
+  "id": "c04",
+  "number": 912,
+  "title": "Ladder: clearer comment on nextPosition, plus a test above the top",
+  "body": "A small clarity change in the shared ladder code. No behaviour change.\n\n## What changed\n- `js/core/ladder.js`: the comment on `nextPosition` said only \"The puzzle after this one.\" It now says how it moves: the next puzzle in the level, the next level after `puzzlesPerLevel` puzzles, and at the top level (or above it) it stays there while `n` keeps counting.\n- `tests/unit/ladder.test.js`: one more check in the endless test: from a level above the top, the next puzzle is at the top level.\n\n## How to try it\nNothing to see in the game; `npx vitest run tests/unit/ladder.test.js`.\n\n## Checks\n- The new check is inside an existing test, so the test count doesn't change.\n- Local `npm run check`: type check passed, 378 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-912-next-position-doc",
+  "expect": {
+    "kind": "clean"
+  },
+  "why": "A comment that now matches what the code does, plus a correct extra assertion; no logic change."
+}

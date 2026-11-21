@@ -1,0 +1,24 @@
+{
+  "id": "b04",
+  "number": 904,
+  "title": "Offline: keep a copy of any file the precache missed",
+  "body": "A safety net for offline play in the installed app.\n\n## What changed\n- `sw.js`: when the installed app asks for a file that isn't in its cache, the service worker now saves the downloaded copy in the same `logic-lane:` cache, so the file works offline next time too. Until now such a file was fetched every time and failed offline.\n- The precache test still checks that `PRECACHE` lists every shipped file; this only helps if something slips through (for example a file the browser asks for by itself).\n- Local and review runs are unchanged: with `VERSION` = `dev` the service worker still always loads the latest files. `VERSION` is untouched.\n\n## How to try it\nThis only runs in the deployed app (cache-first mode). Locally the service worker tests cover the install, update and offline flows.\n\n## Checks\n- Local `npm run check`: type check passed, 378 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-904-cache-missed-files",
+  "expect": {
+    "kind": "bug",
+    "file": "sw.js",
+    "match": [
+      "response.ok",
+      "res.ok",
+      "404",
+      "error response",
+      "error page",
+      "bad response",
+      "not ok",
+      "4xx",
+      "non-200",
+      "status code"
+    ]
+  },
+  "why": "Checklist §5 offline/update logic: cacheFirst now caches any response, including 404s and server errors, and then serves that broken copy for the rest of the version, so a temporary error during a deploy breaks the file for good."
+}

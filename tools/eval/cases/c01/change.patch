@@ -1,0 +1,53 @@
+diff --git a/games/arrow-path/view.js b/games/arrow-path/view.js
+index 42aa0b0..825403b 100644
+--- a/games/arrow-path/view.js
++++ b/games/arrow-path/view.js
+@@ -53,6 +53,19 @@ function arrow(d, className = 'ap-arrow') {
+   return span;
+ }
+ 
++/**
++ * The 🔁 picture with its count (×2 or ×3), as shown in a move slot and on a key.
++ * @param {'x2' | 'x3'} t
++ * @returns {HTMLSpanElement[]}
++ */
++function loopIcon(t) {
++  const icon = make('span', 'ap-loop-icon');
++  icon.textContent = '🔁';
++  const n = make('span', 'ap-loop-n');
++  n.textContent = t === 'x3' ? '×3' : '×2';
++  return [icon, n];
++}
++
+ /**
+  * Restore saved board arrows, keeping only ones that still make sense for this puzzle.
+  * @param {Puzzle} p
+@@ -225,13 +238,8 @@ export function mountView(el, p, api) {
+         button.replaceChildren(arrow(t));
+         button.setAttribute('aria-label', `Move ${i + 1}, ${WORDS[t]}`);
+       } else {
+-        const times = t === 'x3' ? '3' : '2';
+-        const icon = make('span', 'ap-loop-icon');
+-        icon.textContent = '🔁';
+-        const n = make('span', 'ap-loop-n');
+-        n.textContent = `×${times}`;
+-        button.replaceChildren(icon, n);
+-        button.setAttribute('aria-label', `Move ${i + 1}, repeat ${times} times`);
++        button.replaceChildren(...loopIcon(t));
++        button.setAttribute('aria-label', `Move ${i + 1}, repeat ${t === 'x3' ? 3 : 2} times`);
+       }
+     });
+   };
+@@ -289,11 +297,7 @@ export function mountView(el, p, api) {
+         const times = t === 'x3' ? '3' : '2';
+         const button = make('button', 'big-button ap-key ap-key-loop', `Repeat ${times} times`);
+         button.dataset.token = t;
+-        const icon = make('span', 'ap-loop-icon');
+-        icon.textContent = '🔁';
+-        const n = make('span', 'ap-loop-n');
+-        n.textContent = `×${times}`;
+-        button.append(icon, n);
++        button.append(...loopIcon(t));
+         button.addEventListener('click', () => put(t));
+         keys.append(button);
+       }

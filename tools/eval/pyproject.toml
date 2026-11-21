@@ -19,3 +19,5 @@ exclude-newer = "2026-11-07T00:00:00Z"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The tests import the scripts in this folder (score.py, eval_review.py).
+pythonpath = ["."]

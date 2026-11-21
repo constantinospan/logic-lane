@@ -1,0 +1,26 @@
+diff --git a/js/core/ladder.js b/js/core/ladder.js
+index 869b0ab..a21c0b1 100644
+--- a/js/core/ladder.js
++++ b/js/core/ladder.js
+@@ -23,7 +23,8 @@ export function startLevel(ladder, difficulty) {
+ }
+ 
+ /**
+- * The puzzle after this one.
++ * The puzzle after this one: the next puzzle in the level, or the first one of the next level after
++ * `puzzlesPerLevel` puzzles. At the top level (or above it) it stays at the top level and `n` keeps counting.
+  * @param {Ladder} ladder
+  * @param {{ level: number, n: number }} position
+  * @returns {{ level: number, n: number }}
+diff --git a/tests/unit/ladder.test.js b/tests/unit/ladder.test.js
+index 085c998..7262105 100644
+--- a/tests/unit/ladder.test.js
++++ b/tests/unit/ladder.test.js
+@@ -19,6 +19,7 @@ describe('ladder', () => {
+     expect(nextPosition(ladder, { level: 29, n: 2 })).toEqual({ level: 30, n: 0 });
+     expect(nextPosition(ladder, { level: 30, n: 2 })).toEqual({ level: 30, n: 3 });
+     expect(nextPosition(ladder, { level: 30, n: 99 })).toEqual({ level: 30, n: 100 });
++    expect(nextPosition(ladder, { level: 31, n: 0 })).toEqual({ level: 30, n: 1 }); // never above the top
+   });
+ 
+   it('rejects broken ladders', () => {

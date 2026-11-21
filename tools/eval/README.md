@@ -66,10 +66,28 @@ You run these in Terminal. Each step says what it does, so you learn the tools a
 
 8. **Tell Claude it's done**, and paste the output of `uv run pytest -v`. Claude commits `uv.lock`.
 
-## What comes in E2b
-- `cases/`: small changes to the code, some with a planted bug, some clean. `cases-hidden/`: more of the same,
-  never shown to the rule-fix agent (E2d).
-- A script that runs the real code reviewer on each case, 3 times, exactly as GitHub does.
-- Scoring and a report, which you write from Claude's outline and tests.
-- One more setup step then: `claude setup-token`, so the eval logs in on its own, without your personal Claude
-  settings.
+## The eval's login
+The eval logs in with its own token, on your Claude subscription (no API key, so nothing is billed per use; it
+uses your plan's quota). One time, in your own Terminal:
+1. `claude setup-token`, and copy the token it prints.
+2. `security add-generic-password -a "$USER" -s logic-lane-eval -w`, and paste the token both times it asks.
+
+The token stays in your Keychain. Never paste it into a chat.
+
+## Running it
+In `tools/eval` (add `--system-certs` after `uv run` on a work Mac):
+- `uv run python eval_review.py`: every case, 3 runs each, about 10 minutes. Results and `report.md` go in
+  `out/<time>/` (never committed).
+- `--cases b01,c01` for some cases, `--runs 1` for a quick try, `--rules <commit>` to test other rules.
+- `uv run pytest`: the offline tests. `EVAL_LIVE=1 uv run pytest tests/test_live_canary.py -s` also checks, with a
+  few short real runs, that the reviewer is cut off from everything it shouldn't see.
+
+## What's in here
+- `cases/`: small changes on one base commit (`cases/BASE`), some with a planted bug, some clean. Each has the
+  PR text, the patch, local check counts and what the reviewer should find (`case.json`). `cases-hidden/`: more
+  of the same, never shown to the rule-fix agent (E2d). The report only gives their combined numbers.
+- `eval_review.py`: runs the real code reviewer on each case exactly as the GitHub job does (its prompt, tools,
+  turn limit, schema and `review-input/` files). Each run gets a throwaway folder: main's code as of the base
+  commit, the rules being tested, and the PR in `pr/`. A macOS sandbox stops it reading your home folder, this
+  repo and other runs' folders.
+- `score.py`: scores each run (caught, missed, weak, false alarm) and writes the report.

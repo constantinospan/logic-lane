@@ -1,0 +1,18 @@
+{
+  "id": "b05",
+  "number": 905,
+  "title": "Offline: try again if the service worker doesn't register the first time",
+  "body": "On a weak connection the very first visit can fail to register the service worker, and then the app isn't ready for offline until the next visit.\n\n## What changed\n- `js/pwa/update.js`: if registering fails, the app tries once more after 5 seconds. If that fails too, it gives up quietly, as before: the app still works online.\n- The code that shows the \"⬆️ New!\" banner moved into a small `registered` function, so both tries use the same code. No change to how the banner works.\n\n## How to try it\n`node tests/serve.mjs`, open `http://localhost:4173/logic-lane/`. The normal path is unchanged; the second try only runs when the first one fails.\n\n## Checks\n- Local `npm run check`: type check passed, 378 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-905-sw-register-retry",
+  "expect": {
+    "kind": "bug",
+    "file": "js/pwa/update.js",
+    "match": [
+      "absolute",
+      "relative",
+      "/sw.js",
+      "./sw.js"
+    ]
+  },
+  "why": "CLAUDE.md and checklist §5: relative paths only, because the site is served from /logic-lane/; the retry registers '/sw.js', which points at the domain root, not the app."
+}

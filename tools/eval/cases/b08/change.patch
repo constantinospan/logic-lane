@@ -1,0 +1,21 @@
+diff --git a/games/arrow-path/levels.js b/games/arrow-path/levels.js
+index 6712e39..27b26d5 100644
+--- a/games/arrow-path/levels.js
++++ b/games/arrow-path/levels.js
+@@ -65,12 +65,14 @@ export const LEVELS = [
+ export const MAX_SLOTS = 10;
+ 
+ /**
+- * The rules for a level. Above the top level, puzzles keep level 30's rules (endless, D14).
++ * The rules for a level. Above the top level, puzzles keep level 30's rules (endless, D14). A level that isn't a
++ * number (e.g. from a damaged save) gets level 1's rules instead of crashing the screen.
+  * @param {number} level
+  * @returns {Rules}
+  */
+ export function rulesFor(level) {
+-  const i = Math.min(Math.max(1, Math.floor(level)), LEVELS.length) - 1;
++  const n = Number.isFinite(level) ? Math.floor(level) : 1;
++  const i = Math.min(Math.max(1, n), LEVELS.length) - 1;
+   return LEVELS[i];
+ }
+ 

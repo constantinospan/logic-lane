@@ -1,0 +1,60 @@
+diff --git a/games/demo/game.js b/games/demo/game.js
+index 12319f4..c4ff138 100644
+--- a/games/demo/game.js
++++ b/games/demo/game.js
+@@ -3,6 +3,35 @@
+ 
+ /** @typedef {{ emoji: string, word: string }} Thing */
+ 
++/** Right first time, in a row: the current run and her best. */
++const STREAK_KEY = 'logic-lane:demo-streak';
++
++/**
++ * @typedef {object} Streak
++ * @property {number} now  Puzzles solved first time in a row.
++ * @property {number} best
++ */
++
++/** @returns {Streak} */
++function loadStreak() {
++  try {
++    const saved = JSON.parse(localStorage.getItem(STREAK_KEY) ?? 'null');
++    if (saved && Number.isInteger(saved.now) && Number.isInteger(saved.best)) return saved;
++  } catch {
++    /* blocked or corrupt: start a new streak */
++  }
++  return { now: 0, best: 0 };
++}
++
++/** @param {Streak} streak */
++function saveStreak(streak) {
++  try {
++    localStorage.setItem(STREAK_KEY, JSON.stringify(streak));
++  } catch {
++    /* blocked or full: the streak just isn't kept */
++  }
++}
++
+ /** @type {Thing[]} */
+ const THINGS = [
+   { emoji: '⭐', word: 'star' },
+@@ -44,6 +73,10 @@ const demo = {
+     /** @type {DemoPuzzle} */
+     const p = puzzle;
+     const state = /** @type {{ wrong: number } | null} */ (api.state) ?? { wrong: 0 };
++    const streak = loadStreak();
++    if (streak.now >= 3 && streak.now === streak.best) {
++      api.setInstruction(`${streak.now} in a row! Tap the same picture.`);
++    }
+ 
+     el.innerHTML = '';
+     const wrap = document.createElement('div');
+@@ -64,6 +97,8 @@ const demo = {
+       button.setAttribute('aria-label', thing.word);
+       button.addEventListener('click', () => {
+         if (thing === p.target) {
++          const now = state.wrong === 0 ? streak.now + 1 : 0;
++          saveStreak({ now, best: Math.max(streak.best, now) });
+           api.solved();
+         } else {
+           state.wrong += 1;

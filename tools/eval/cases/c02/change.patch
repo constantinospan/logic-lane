@@ -1,0 +1,25 @@
+diff --git a/games/arrow-path/view.js b/games/arrow-path/view.js
+index 42aa0b0..9c15994 100644
+--- a/games/arrow-path/view.js
++++ b/games/arrow-path/view.js
+@@ -67,6 +67,7 @@ export function restoreArrows(p, saved) {
+   const blocked = new Set([key(...p.start), key(...p.gem), ...p.rocks.map(([r, c]) => key(r, c))]);
+   for (const [k, d] of Object.entries(arrowsIn)) {
+     const [r, c] = k.split(',').map(Number);
++    if (k !== key(r, c) || !Number.isInteger(r) || !Number.isInteger(c)) continue; // not a square, e.g. "1.5,2"
+     if (isDir(d) && r >= 0 && c >= 0 && r < p.rows && c < p.cols && !blocked.has(k)) arrows[k] = d;
+   }
+   return arrows;
+diff --git a/tests/unit/games/arrow-path.test.js b/tests/unit/games/arrow-path.test.js
+index 6ad9031..e48ab87 100644
+--- a/tests/unit/games/arrow-path.test.js
++++ b/tests/unit/games/arrow-path.test.js
+@@ -299,6 +299,8 @@ describe('arrow-path resume (saved progress, D7)', () => {
+     expect(restoreArrows(board, { arrows: { '0,2': 'D' } })).toEqual({ '0,2': 'D' });
+     const odd = { '0,0': 'D', '2,2': 'L', '1,1': 'U', '9,9': 'R', '0,1': 'X', 'a,b': 'R', '1,2': 'L' };
+     expect(restoreArrows(board, { arrows: odd })).toEqual({ '1,2': 'L' });
++    const notSquares = { '1.5,2': 'D', '0,1.5': 'D', '01,2': 'D', ' 1,2': 'D', '1,2,0': 'D', '2,0': 'U' };
++    expect(restoreArrows(board, { arrows: notSquares })).toEqual({ '2,0': 'U' });
+     for (const junk of [null, undefined, 5, 'x', { arrows: 3 }, { arrows: null }, { program: ['R'] }]) {
+       expect(restoreArrows(board, junk)).toEqual({});
+     }

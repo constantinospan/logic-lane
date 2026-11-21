@@ -1,0 +1,24 @@
+{
+  "id": "b06",
+  "number": 906,
+  "title": "Arrow Path: keep the gem away from the start on levels 7–10",
+  "body": "On the later board levels, a long route sometimes curls back so the gem ends up right next to the robot, which looks too easy.\n\n## What changed\n- `games/arrow-path/levels.js`: levels 7–10 get a new rule, `gemDistance: 3`: the gem is at least 3 squares from the start (across plus down).\n- `games/arrow-path/generate.js`: board puzzles that break the rule are thrown away and built again, like the other rules. Every other level builds exactly the same puzzles as before.\n- Arrow Path's `version` goes from 1 to 2, because `createPuzzle` changed (saves from version 1 are dropped, as `docs/GAME-API.md` says). The two browser tests that write an Arrow Path save by hand (`visual.spec.js`, `a11y.spec.js`) now use version 2. Their pictures don't change: the photographed levels (4, 11, 14, 21) give the same puzzles as before.\n\n## How to try it\n`node tests/serve.mjs`, open `http://localhost:4173/logic-lane/`, Arrow Path → Easy, and play up to level 7, or long-press the level indicator to check the level.\n\n## Checks\n- Local `npm run check`: type check passed, 378 unit tests passed, 183 browser tests passed. Visual snapshots skipped locally (they run only on GitHub); no picture should change.\n- No decisions changed. No packages added or upgraded.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "branch": "claude/issue-906-gem-distance",
+  "expect": {
+    "kind": "bug",
+    "file": "games/arrow-path/generate.js",
+    "match": [
+      "no test",
+      "no unit test",
+      "isn't tested",
+      "not tested",
+      "untested",
+      "doesn't test",
+      "missing test",
+      "without test",
+      "lacks a test",
+      "doesn't cover"
+    ]
+  },
+  "why": "CLAUDE.md step 3 and checklist §3/§5: new generator rules need generator tests that check every puzzle stays within the level's rules; nothing tests the new gemDistance rule."
+}
