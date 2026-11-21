@@ -29,17 +29,17 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 
 **Optional, later: measuring the AI pipeline (owner's learning, never blocks games).** Python, in learning mode:
 Claude writes most of it, the owner writes a few small pieces with Claude's outline, tests and review. Python is
-for offline tools only and is never shipped (D23). Packages: pytest only,
-pinned with uv (owner approved, 2026-11-15).
+for offline tools only and is never shipped (D23). Packages: pytest only, pinned with uv (owner approved, 2026-11-15).
 
 | # | Item | What happens | Your time | Claude's time |
 |---|------|--------------|-----------|---------------|
-| E1 ✅ | Save the logs | A private repo, `logic-lane-archive`, keeps a raw copy of every Actions run with its full log, and every issue and PR with comments, events, labels, commits, files and reviews (D24). A scheduled workflow there collects what's new: daily, weekly after 2026-12-20 (it opens a reminder issue). It goes red if a log GitHub still has is missing. GitHub deletes logs after 90 days, so this keeps them. No packages needed | 15 min (token) | ~5 h |
+| E1 ✅ | Save the logs | A private repo, `logic-lane-archive`, keeps a raw copy of every Actions run with its full log, and every issue and PR with comments, events, labels, commits, files and reviews (D24). A scheduled workflow there collects what's new: daily, weekly after 2026-12-20 (it opens a reminder issue). It goes red if a log GitHub still has is missing, or something failed to download. GitHub deletes logs after 90 days, so this keeps them. No packages needed | 15 min (token) | ~5 h |
 | E2 | Measure and eval | Rebuild the pipeline's numbers with one command, a planted-bug test of the code reviewer (bugs and clean changes, repeated runs), then change one thing (e.g. the model) and compare | 8 to 12 h | ~25 h |
 
-Decisions to take when E2 starts: who does the local Python setup, where the eval's own data lives (the raw history
-is settled: E1's private archive, D24), how the eval runs the reviewers, which reviewers, how many cases, the one change to compare, how findings get labelled, pinning the model,
-and when the eval runs (the raw history's schedule is settled in E1).
+Decisions to take when E2 starts: who does the local Python setup, where the eval's own data lives, how the eval
+runs the reviewers, which reviewers, how many cases, the one change to compare, how findings get labelled, pinning
+the model, whether Python may run in this repo's workflows, and when the eval runs. (E1 settled where the raw history
+lives and how often it's collected, D24.)
 
 **Totals (rough):** you ~1.5 h spread across steps 1, 2, 3, 7, 9; Claude ~1.5–2 days of work sessions.
 
