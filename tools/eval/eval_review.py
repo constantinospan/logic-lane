@@ -36,10 +36,14 @@ OWNER = "constantinospan"
 REPO = "constantinospan/logic-lane"
 KEYCHAIN_SERVICE = "logic-lane-eval"  # where the eval's login token is kept (README)
 RUN_TIMEOUT_S = 30 * 60  # the code-review job's timeout
-RUNS_TMP = Path("/private/tmp/ll-eval-runs")  # throwaway run folders, outside the home folder (the sandbox blocks it)
+# Throwaway run folders, outside the home folder (the sandbox blocks it). Real path: /tmp is /private/tmp on a Mac.
+RUNS_TMP = Path(os.path.realpath("/tmp")) / "ll-eval-runs"
 # The files the eval is testing (and E2d's rule fixes change). The run folder's root is main's code as of BASE,
 # like the PR's own base, with only these taken from the rules commit.
 RULE_PATHS = ["CLAUDE.md", ".claude", "docs/REVIEW-CHECKLIST.md", "docs/DECISIONS.md", "tools/review"]
+# Claude Code loads these from the root and runs hooks as commands next to the login token, so they always come from
+# a trusted commit (main on GitHub), never from the rules being tested. Changes to them aren't evaluated.
+TRUSTED_PATHS = [".claude/settings.json", ".claude/settings.local.json", ".claude/hooks", ".mcp.json"]
 # git for building run folders: none of the owner's own git settings, which could change diffs or commits.
 GIT_ENV = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "en_US.UTF-8",
            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"}
@@ -170,39 +174,59 @@ def git(*args: str, cwd: Path | None = None, input: bytes | None = None) -> str:
     return r.stdout.decode(errors="replace")
 
 
-def build_run_folder(root: Path, rules_commit: str, base: str, case: dict) -> str:
+def build_run_folder(root: Path, rules_commit: str, base: str, case: dict, trusted: str | None = None) -> str:
     """Make `root` look like the code-review job's folder. Returns the case commit's SHA.
 
-    ./            main as the reviewer sees it: a plain copy (git archive) of BASE, which is also pr/'s
-                  origin/main, with RULE_PATHS replaced by rules_commit's (the rules being evaluated). Without
-                  tools/eval/, so the reviewer can never read the cases or their answers. Not a worktree: a
-                  worktree points back to this repo.
-    pr/           BASE's history only, origin/main = BASE, plus one commit with the case's change.
+    ./            main as the reviewer sees it: a plain copy (git archive) of BASE, with RULE_PATHS replaced by
+                  rules_commit's (the rules being evaluated) and TRUSTED_PATHS by `trusted`'s (default: the
+                  rules commit). Without tools/eval/, so the reviewer can never read the cases or their answers.
+                  Not a worktree: a worktree points back to this repo.
+    pr/           BASE's history, then one "main" commit putting the same rule files in place (a real PR's
+                  checkout has them too) which is origin/main, then one commit with the case's change.
     review-input/ what tools/review/collect-inputs.sh writes.
     """
+    trusted = trusted or rules_commit
+
     def extract(commit: str, *paths: str) -> None:
         archive = subprocess.run(["git", "archive", commit, "--", *paths], cwd=REPO_ROOT, capture_output=True,
                                  check=True, env=GIT_ENV).stdout
         subprocess.run(["tar", "-x", "-C", str(root)], input=archive, check=True)
 
+    def replace(paths: list[str], commit: str) -> None:
+        for p in paths:
+            target = root / p
+            shutil.rmtree(target, ignore_errors=True) if target.is_dir() else target.unlink(missing_ok=True)
+        present = [p for p in paths if git("ls-tree", "--name-only", commit, "--", p, cwd=REPO_ROOT).strip()]
+        if present:
+            extract(commit, *present)
+
     extract(base)
-    for p in RULE_PATHS:
-        target = root / p
-        shutil.rmtree(target, ignore_errors=True) if target.is_dir() else target.unlink(missing_ok=True)
-    present = [p for p in RULE_PATHS if git("ls-tree", "--name-only", rules_commit, "--", p, cwd=REPO_ROOT).strip()]
-    extract(rules_commit, *present)
+    replace(RULE_PATHS, rules_commit)
+    replace(TRUSTED_PATHS, trusted)
     shutil.rmtree(root / "tools" / "eval", ignore_errors=True)
 
     pr = root / "pr"
     pr.mkdir()
+    bot = ["-c", "user.name=claude[bot]", "-c", "user.email=noreply@anthropic.com"]
     git("init", "-q", "-b", "main", cwd=pr)
     git("fetch", "-q", "--no-tags", str(REPO_ROOT), base, cwd=pr)
     (pr / ".git" / "FETCH_HEAD").unlink(missing_ok=True)  # it names the real repo's folder
-    git("update-ref", "refs/remotes/origin/main", base, cwd=pr)
-    git("checkout", "-q", "-b", case["branch"], base, cwd=pr)
+    git("checkout", "-q", "--detach", base, cwd=pr)
+    for p in RULE_PATHS + TRUSTED_PATHS:
+        target, source = pr / p, root / p
+        shutil.rmtree(target, ignore_errors=True) if target.is_dir() else target.unlink(missing_ok=True)
+        if source.is_dir():
+            shutil.copytree(source, target)
+        elif source.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+    git("add", "-A", ".", cwd=pr)  # pr/ holds only BASE's files and these
+    if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=pr, env=GIT_ENV).returncode:
+        git(*bot, "commit", "-q", "-m", "Agent rules as on main", cwd=pr)
+    git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=pr)
+    git("checkout", "-q", "-b", case["branch"], cwd=pr)
     git("apply", "--index", str(case["dir"] / "change.patch"), cwd=pr)
-    git("-c", "user.name=claude[bot]", "-c", "user.email=noreply@anthropic.com",
-        "commit", "-q", "-m", case["title"], cwd=pr)
+    git(*bot, "commit", "-q", "-m", case["title"], cwd=pr)
     sha = git("rev-parse", "HEAD", cwd=pr).strip()
 
     ri = root / "review-input"

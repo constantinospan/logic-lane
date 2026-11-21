@@ -352,6 +352,9 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 - E1's collector uses only Python's built-in library, with `unittest` for tests. No packages.
 - E2 may add **pytest**, pinned with **uv** (owner approved, 2026-11-15). Any other package needs the owner's OK, as
   for npm.
+- **In this repo's workflows (owner, 2026-11-21, E2c):** the eval's scripts may run in GitHub Actions, with Python's
+  built-in library only (D26). CI runs the eval's tests with pytest, installed by pip from exact versions and
+  hashes (`tools/eval/requirements-dev.txt`, made from `uv.lock`), ready-built only. No new action for Python.
 - Why: the owner is learning Python with these tools (learning mode: Claude writes most of it and explains it, the
   owner writes small pieces).
 
@@ -392,7 +395,8 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 - **Scoring:** caught = a Blocking finding about the planted bug. Only a Suggestion counts as missed, because the PR
   would still pass. A run that crashes or doesn't finish is an error, not a miss (like D17's ⚠️). The headline false
   alarm number is Blocking findings on clean cases. The owner can relabel any result by hand.
-- **Where it runs:** on the owner's Mac, by hand, with results kept locally (not committed). Automatic runs are E2c.
+- **Where it runs:** on the owner's Mac, by hand, with results kept locally (not committed). It also runs by itself
+  on GitHub (D26).
 - **Rule-fix PRs (E2d, owner 2026-11-21):** the rule-fix agent only pushes its branch. A plain script step in the
   workflow, not the AI, then opens the PR, with an @mention of the owner and a `rule-fix` label. The AI never gets
   permission to open PRs, and the owner always merges by hand. This is the one exception to D15's "Create PR link";
@@ -400,3 +404,30 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 - **Packages:** pytest only (D23), plus the few packages pytest itself needs, all pinned exactly in
   `tools/eval/uv.lock`. uv ignores releases newer than a fixed
   date in `pyproject.toml`, the same "at least 2 weeks old" rule as for GitHub actions.
+
+### D26. The eval runs by itself on GitHub (owner, 2026-11-21, plan item E2c)
+- **Where:** a workflow, `.github/workflows/eval.yml`. Each review runs through the same pinned action, settings,
+  prompt, tools and token limits as the code-review job, on a fresh machine (owner chose GitHub over a Mac timer).
+- **When:**
+  - daily, but only if something that decides the result changed: the agent rules, the code-review job, the
+    eval's cases, or the model;
+  - after the AI review on the owner's PRs that change what the code reviewer reads (after, so it never
+    competes with the real review for the Claude plan's limits);
+  - and by hand.
+  A "fingerprint" of the files' content and the model stands for "what changed"; a clean, complete eval is
+  saved under it for 90 days.
+- **Model:** the review job doesn't pin one, so a tiny daily probe through the same action asks which model
+  answers (owner's choice). review.yml is unchanged.
+- **Switch:** `AI_EVAL=on` (repo variable), like `AI_FIX` (D17). On from the start (owner's choice); runs by hand
+  work even when it's off. A full eval is 36 reviews.
+- **No answers on the reviewer's machine:** a job without Claude builds the run folders. The review jobs never
+  check out this repo. `.claude/` settings, hooks and `.mcp.json` always come from main, never from the rules
+  being tested, because they run next to the login token.
+- **Results:**
+  - On a PR, one comment with the PR's numbers and main's for comparison.
+  - Daily and by-hand runs show the report on the run's page and keep it as a run file (90 days).
+  - Nothing is committed. Hidden cases only appear as combined numbers.
+- **Information only:** never a required check, and a low score never turns a run red. A run goes red only when
+  reviews error or give no result, so GitHub emails the owner.
+- **60-day switch-off:** GitHub pauses scheduled workflows in a public repo after 60 days without activity. No
+  keep-alive (that would push to main); the owner switches it back on (README).

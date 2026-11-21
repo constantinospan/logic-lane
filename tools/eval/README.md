@@ -82,6 +82,19 @@ In `tools/eval` (add `--system-certs` after `uv run` on a work Mac):
 - `uv run pytest`: the offline tests. `EVAL_LIVE=1 uv run pytest tests/test_live_canary.py -s` also checks, with a
   few short real runs, that the reviewer is cut off from everything it shouldn't see.
 
+## On GitHub (D26)
+`.github/workflows/eval.yml` runs the same eval by itself, through the same pinned action as the real code review:
+- **Daily**, but only when something that decides the result changed (rules, the code-review job, the cases, or
+  the model, which a tiny probe checks). The report is on the run's page (Actions → Eval).
+- **After the AI review on your PRs** that change what the code reviewer reads: one comment with the PR's numbers
+  and main's.
+- **By hand:** Actions → Eval → Run workflow, with the cases, runs and rules to test.
+- **Switch:** Settings → Secrets and variables → Actions → Variables, `AI_EVAL` = `on`. Anything else is off.
+- **If GitHub pauses it** (after 60 days without activity in the repo): Actions → Eval → Enable workflow.
+
+CI runs the tests here on every PR (`eval-tests`), installing pytest from `requirements-dev.txt`. After changing
+`uv.lock`, remake it with the command at the top of that file (a test fails until you do).
+
 ## What's in here
 - `cases/`: small changes on one base commit (`cases/BASE`), some with a planted bug, some clean. Each has the
   PR text, the patch, local check counts and what the reviewer should find (`case.json`). `cases-hidden/`: more
@@ -91,3 +104,4 @@ In `tools/eval` (add `--system-certs` after `uv run` on a work Mac):
   commit, the rules being tested, and the PR in `pr/`. A macOS sandbox stops it reading your home folder, this
   repo and other runs' folders.
 - `score.py`: scores each run (caught, missed, weak, false alarm) and writes the report.
+- `ci_eval.py`: the GitHub workflow's steps (which cases, the fingerprint, run folders, the report).

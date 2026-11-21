@@ -1,0 +1,431 @@
+# The eval of the AI code reviewer, on its own (plan item E2c, D26). It runs the code-review job of review.yml on
+# fixed cases (tools/eval/), 3 times each, and scores bugs caught, false alarms and errors.
+#
+# When: daily, but only if something that decides the result changed (agent rules, the code-review job, the eval's
+# cases, or the model, which a tiny daily probe checks); after the AI review on the owner's PRs that change agent
+# rules; and by hand (Actions → Eval → Run workflow), which runs even when the switch is off.
+#
+# Switch (Settings → Secrets and variables → Actions → Variables): AI_EVAL=on. Anything else means off. Turn it off
+# if the Claude plan's limits run low. A full eval is 36 reviews.
+#
+# Security (public repo): like review.yml. workflow_run and schedule always use main's copy of this file. Reviewer
+# jobs get a read-only token, never check out this repo (so the cases' answers aren't on that machine), and get
+# .claude/settings, hooks and .mcp.json from main, never from the rules being tested. Only the comment job (no
+# Claude) can write, and only a PR comment. Keep show_full_output off (logs are public).
+name: Eval
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: Case ids, comma-separated, or all
+        default: all
+      runs:
+        description: Runs per case
+        default: '3'
+      rules:
+        description: Branch or commit whose agent rules to test
+        default: main
+
+permissions: {} # every job asks for what it needs
+
+concurrency:
+  # One eval per PR branch (a newer push replaces it); main's (daily, by hand) never stops halfway. CI runs on
+  # main's own pushes land in the "pr-main" group and do nothing, so they never cancel main's eval.
+  group: eval-${{ github.event_name == 'workflow_run' && format('pr-{0}', github.event.workflow_run.head_branch) || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
+
+jobs:
+  plan:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (vars.AI_EVAL == 'on' && (github.event_name == 'schedule' || (
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (github.event.workflow_run.actor.login == 'constantinospan' || github.event.workflow_run.actor.login == 'claude[bot]'))))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60 # most of it is waiting for the AI review
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: read
+    outputs:
+      go: ${{ steps.what.outputs.go }}
+      mode: ${{ steps.what.outputs.mode }}
+      number: ${{ steps.what.outputs.number }}
+      rules: ${{ steps.what.outputs.rules }}
+      main: ${{ steps.what.outputs.main }}
+      cases: ${{ steps.what.outputs.cases }}
+      runs: ${{ steps.what.outputs.runs }}
+      matrix: ${{ steps.what.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0 # the cases' base commit and the rules commit
+          persist-credentials: false
+      - name: What to run
+        id: what
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          IN_CASES: ${{ inputs.cases }}
+          IN_RUNS: ${{ inputs.runs }}
+          IN_RULES: ${{ inputs.rules }}
+        run: |
+          set -euo pipefail
+          echo "go=false" >> "$GITHUB_OUTPUT"
+          main=$(git rev-parse HEAD)
+          cases=all runs=3 number=
+          case "$EVENT" in
+            schedule) mode=daily rules=$main ;;
+            workflow_dispatch)
+              mode=hand cases=${IN_CASES:-all} runs=${IN_RUNS:-3}
+              [[ "$cases" =~ ^[a-z0-9,\ ]+$ && "$runs" =~ ^[1-9]$ ]] || { echo "::error::Bad cases or runs input."; exit 1; }
+              rules=$(git rev-parse --verify -q "origin/${IN_RULES}^{commit}" || git rev-parse --verify "${IN_RULES}^{commit}")
+              ;;
+            workflow_run)
+              mode=pr rules=$SHA
+              if ! [[ "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]; then echo "::notice::Unusual branch name, no eval."; exit 0; fi
+              # The same PR lookup as review.yml's gate.
+              prs=$(gh api "repos/${REPO}/commits/${SHA}/pulls" --jq '[.[] | select(.state == "open" and .base.ref == "main"
+                and .head.ref == $ENV.BRANCH and .head.repo.full_name == $ENV.REPO and .user.login == "constantinospan")]')
+              if [ "$(jq length <<<"$prs")" != 1 ] || [ "$(jq -r '.[0].head.sha' <<<"$prs")" != "$SHA" ]; then
+                echo "::notice::No single open PR by the owner at this commit, no eval."; exit 0
+              fi
+              number=$(jq -r '.[0].number' <<<"$prs")
+              changed=$(gh api "repos/${REPO}/pulls/${number}/files" --paginate --jq '.[].filename')
+              if [ "$(python3 tools/eval/ci_eval.py trigger <<<"$changed")" != true ]; then
+                echo "::notice::The PR doesn't change what the code reviewer reads, no eval."; exit 0
+              fi
+              ;;
+          esac
+          matrix=$(cd tools/eval && python3 ci_eval.py matrix --cases "$cases" --runs "$runs")
+          {
+            echo "mode=$mode"; echo "number=$number"; echo "rules=$rules"; echo "main=$main"
+            echo "cases=$cases"; echo "runs=$runs"; echo "matrix=$matrix"; echo "go=true"
+          } >> "$GITHUB_OUTPUT"
+          echo "Eval: $mode, rules $rules, cases $cases, $runs run(s) each" >> "$GITHUB_STEP_SUMMARY"
+      # After the real review, not alongside it, so the eval never competes with it for the Claude plan's limits.
+      - name: Wait for the AI review
+        if: ${{ steps.what.outputs.mode == 'pr' && vars.AI_REVIEW == 'on' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          for _ in $(seq 1 90); do
+            state=$(gh api "repos/${REPO}/commits/${SHA}/statuses" --jq '[.[] | select(.context == "ai-review")][0].state // "none"' || echo none)
+            if [ "$state" != none ] && [ "$state" != pending ]; then echo "AI review: $state"; exit 0; fi
+            sleep 30
+          done
+          echo "::notice::The AI review hasn't finished after 45 minutes. Going ahead."
+      - name: Run folders, without any answers
+        if: ${{ steps.what.outputs.go == 'true' }}
+        env:
+          RULES: ${{ steps.what.outputs.rules }}
+          MAIN: ${{ steps.what.outputs.main }}
+          CASES: ${{ steps.what.outputs.cases }}
+        run: |
+          set -euo pipefail
+          git fetch -q origin "$RULES" 2>/dev/null || true # a PR head that isn't on a branch yet
+          python3 tools/eval/ci_eval.py prepare --rules "$RULES" --main "$MAIN" --cases "$CASES" --out "$RUNNER_TEMP/cases"
+          mkdir "$RUNNER_TEMP/up"
+          for d in "$RUNNER_TEMP"/cases/*/; do
+            id=$(basename "$d")
+            tar -czf "$RUNNER_TEMP/up/$id.tgz" -C "$d" .
+          done
+      - if: ${{ steps.what.outputs.go == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: case-folders
+          path: ${{ runner.temp }}/up/
+          retention-days: 1
+
+  # Which model the action uses today: one tiny message, no tools.
+  probe:
+    needs: plan
+    if: ${{ needs.plan.outputs.go == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions: # the code-review job's
+      contents: read
+      pull-requests: read
+      issues: read
+      actions: read
+    env:
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
+    outputs:
+      model: ${{ steps.model.outputs.model }}
+    steps:
+      - name: An empty folder
+        run: git init -q .
+      # The same step as the code-review job in review.yml (CLAUDE_CODE_SUBPROCESS_ENV_SCRUB needs bubblewrap).
+      - name: Sandbox for Claude's commands
+        run: |
+          for i in 1 2 3; do
+            sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends bubblewrap socat && break
+            echo "apt-get attempt $i failed, retrying..."
+            sleep 5
+          done
+          command -v bwrap
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - id: claude
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          allowed_bots: claude
+          prompt: Reply with the single word OK.
+          claude_args: >-
+            --max-turns 1
+            --disallowedTools "Bash,Read,Glob,Grep,Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch,Task"
+      - name: The model
+        id: model
+        env:
+          EXEC: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          model=$(jq -r '[.[] | select(.type == "system" and .subtype == "init")][0].model // empty' "$EXEC")
+          [[ "$model" =~ ^[A-Za-z0-9._:\[\]-]+$ ]] || { echo "::error::No model in the probe's result."; exit 1; }
+          echo "model=$model" >> "$GITHUB_OUTPUT"
+          echo "Model: $model" >> "$GITHUB_STEP_SUMMARY"
+
+  # Has an eval with exactly this content and model already run? Then there's nothing new to learn.
+  decide:
+    needs: [plan, probe]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      run: ${{ steps.fp.outputs.run }}
+      fingerprint: ${{ steps.fp.outputs.fingerprint }}
+      main_fingerprint: ${{ steps.fp.outputs.main_fingerprint }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - id: fp
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MODE: ${{ needs.plan.outputs.mode }}
+          RULES: ${{ needs.plan.outputs.rules }}
+          MAIN: ${{ needs.plan.outputs.main }}
+          CASES: ${{ needs.plan.outputs.cases }}
+          RUNS: ${{ needs.plan.outputs.runs }}
+          MODEL: ${{ needs.probe.outputs.model }}
+        run: |
+          set -euo pipefail
+          git fetch -q origin "$RULES" 2>/dev/null || true
+          cd tools/eval
+          fp=$(python3 ci_eval.py fingerprint --rules "$RULES" --main "$MAIN" --model "$MODEL" --cases "$CASES" --runs "$RUNS")
+          main_fp=$(python3 ci_eval.py fingerprint --rules "$MAIN" --main "$MAIN" --model "$MODEL")
+          seen=$(gh api "repos/${REPO}/actions/artifacts?name=eval-result-${fp}&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | length')
+          run=true
+          if [ "$MODE" != hand ] && [ "$seen" != 0 ]; then
+            run=false
+            echo "Nothing changed since the last eval (fingerprint $fp), so no new one." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          { echo "run=$run"; echo "fingerprint=$fp"; echo "main_fingerprint=$main_fp"; } >> "$GITHUB_OUTPUT"
+
+  # One review, exactly like the code-review job in review.yml. This repo is never checked out here.
+  review:
+    needs: [plan, decide]
+    if: ${{ needs.decide.outputs.run == 'true' }}
+    name: review ${{ matrix.case }}-${{ matrix.run }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    permissions: # the code-review job's
+      contents: read
+      pull-requests: read
+      issues: read
+      actions: read
+    env:
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: case-folders
+          path: ${{ runner.temp }}/dl
+      - name: The run folder
+        id: run
+        env:
+          CASE: ${{ matrix.case }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/case"
+          tar -xzf "$RUNNER_TEMP/dl/${CASE}.tgz" -C "$RUNNER_TEMP/case"
+          rm -rf "$RUNNER_TEMP/dl" # other cases' folders
+          cp -a "$RUNNER_TEMP/case/work/." "$GITHUB_WORKSPACE/"
+          # The root is a git checkout of main in the real job; here a one-commit repo of the same files.
+          git init -q .
+          printf 'pr/\nreview-input/\n' >> .git/info/exclude
+          git add -A
+          git -c user.name=eval -c user.email=noreply@example.invalid commit -q -m main
+          sha256sum CLAUDE.md > "$RUNNER_TEMP/claude-md.sha"
+          {
+            echo "prompt<<EOF_PROMPT"; jq -r .prompt "$RUNNER_TEMP/case/run.json"; echo "EOF_PROMPT"
+            echo "claude_args<<EOF_ARGS"; jq -r .claude_args "$RUNNER_TEMP/case/run.json"; echo "EOF_ARGS"
+          } >> "$GITHUB_OUTPUT"
+          rm -rf "$RUNNER_TEMP/case"
+      - name: Sandbox for Claude's commands
+        run: |
+          for i in 1 2 3; do
+            sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends bubblewrap socat && break
+            echo "apt-get attempt $i failed, retrying..."
+            sleep 5
+          done
+          command -v bwrap
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - id: claude
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          allowed_bots: claude
+          prompt: ${{ steps.run.outputs.prompt }}
+          claude_args: ${{ steps.run.outputs.claude_args }}
+      - name: The rules were not swapped
+        run: sha256sum -c "$RUNNER_TEMP/claude-md.sha"
+      # Only the result (findings, cost, turns, blocked calls) and the model, never the whole transcript.
+      - name: Keep the result
+        if: ${{ always() && steps.claude.outputs.execution_file != '' }}
+        env:
+          EXEC: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          jq '([.[] | select(.type == "system" and .subtype == "init")][0]) as $init
+            | {result: ([.[] | select(.type == "result")] | last), model: $init.model, version: $init.claude_code_version}' \
+            "$EXEC" > "$RUNNER_TEMP/out/saved.json"
+      - if: ${{ always() && steps.claude.outputs.execution_file != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: run-${{ matrix.case }}-${{ matrix.run }}
+          path: ${{ runner.temp }}/out/saved.json
+          retention-days: 7
+
+  report:
+    needs: [plan, decide, review]
+    if: ${{ !cancelled() && needs.decide.outputs.run == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      errors: ${{ steps.score.outputs.errors }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.main }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: run-*
+          path: ${{ runner.temp }}/runs
+      - name: Score
+        id: score
+        env:
+          MATRIX: ${{ needs.plan.outputs.matrix }}
+          FP: ${{ needs.decide.outputs.fingerprint }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/runs"
+          cd tools/eval
+          if python3 ci_eval.py report --runs "$RUNNER_TEMP/runs" --matrix "$MATRIX" --out "$RUNNER_TEMP/result" \
+               --action "claude-code-action v1.0.265" > /dev/null; then errors=0; else errors=1; fi
+          rm -f "$RUNNER_TEMP/result/scored.json" # per run, so it would name the hidden cases
+          echo "$FP" > "$RUNNER_TEMP/result/fingerprint"
+          cat "$RUNNER_TEMP/result/report.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "errors=$errors" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eval-report
+          path: ${{ runner.temp }}/result/
+      # Only a clean, complete eval counts as "already ran", so a broken one is tried again next time.
+      - if: ${{ steps.score.outputs.errors == '0' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eval-result-${{ needs.decide.outputs.fingerprint }}
+          path: ${{ runner.temp }}/result/
+          retention-days: 90
+      - name: Red if a run errored
+        if: ${{ steps.score.outputs.errors != '0' }}
+        run: |
+          echo "::error::Some review runs errored or gave no result. See the report above."
+          exit 1
+
+  comment:
+    needs: [plan, decide, report]
+    if: ${{ !cancelled() && needs.plan.outputs.mode == 'pr' && needs.report.result != 'skipped' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: eval-report
+          path: ${{ runner.temp }}/pr
+      - name: Post or update the comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ needs.plan.outputs.number }}
+          MAIN_FP: ${{ needs.decide.outputs.main_fingerprint }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          marker='<!-- logic-lane:eval -->'
+          main_report="No full eval of main with this model yet."
+          id=$(gh api "repos/${REPO}/actions/artifacts?name=eval-result-${MAIN_FP}&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)][0].id // empty')
+          if [ -n "$id" ]; then
+            gh api "repos/${REPO}/actions/artifacts/${id}/zip" > "$RUNNER_TEMP/main.zip"
+            main_report=$(unzip -p "$RUNNER_TEMP/main.zip" report.md | sed 's/^## Eval report/### Main/')
+          fi
+          {
+            echo "$marker"
+            echo "## 🧪 Eval of the code reviewer"
+            echo
+            echo "This PR's agent rules, run on the eval's fixed cases. Information only: it never blocks the merge."
+            echo
+            sed 's/^## Eval report/### This PR/' "$RUNNER_TEMP/pr/report.md"
+            echo
+            echo "<details><summary>Main, for comparison</summary>"
+            echo
+            echo "$main_report"
+            echo
+            echo "</details>"
+            echo
+            echo "[The run]($RUN_URL)"
+          } > "$RUNNER_TEMP/body.md"
+          existing=$(gh api "repos/${REPO}/issues/${PR}/comments" --paginate \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\")))][0].id // empty")
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/${REPO}/issues/comments/${existing}" -F body=@"$RUNNER_TEMP/body.md" > /dev/null
+          else
+            gh api "repos/${REPO}/issues/${PR}/comments" -F body=@"$RUNNER_TEMP/body.md" > /dev/null
+          fi

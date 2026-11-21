@@ -114,15 +114,33 @@ def test_git_ignores_the_owners_git_settings():
     assert "HOME" not in ev.GIT_ENV
 
 
-def test_pr_history_is_base_plus_the_case_only(folder):
+def test_pr_history_is_base_then_main_rules_then_the_case(folder):
     root, sha = folder
     pr = root / "pr"
-    assert git(pr, "rev-parse", "origin/main").strip() == ev.base_commit()
+    main = git(pr, "rev-parse", "origin/main").strip()
+    assert git(pr, "rev-parse", f"{main}~1").strip() == ev.base_commit()  # HEAD's rules differ from BASE's
+    changed = git(pr, "diff", "--name-only", ev.base_commit(), main).split()
+    assert changed and all(any(c == p or c.startswith(p + "/") for p in ev.RULE_PATHS + ev.TRUSTED_PATHS)
+                           for c in changed)
+    assert (pr / "docs" / "DECISIONS.md").read_text() == (root / "docs" / "DECISIONS.md").read_text()
     assert git(pr, "rev-parse", "HEAD").strip() == sha
     assert git(pr, "log", "--format=%s", "-1").strip() == "Add notes"
+    assert git(pr, "diff", "--name-only", "origin/main...HEAD").split() == ["notes.txt"]
     every_file_ever = git(pr, "log", "--all", "--name-only", "--format=")
     assert "tools/eval" not in every_file_ever
     assert len(git(pr, "branch", "-a").splitlines()) == 2  # the case branch and origin/main
+
+
+def test_trusted_files_come_from_the_trusted_commit(tmp_path, case):
+    # Settings and hooks are loaded at the root and run next to the token: never from the rules under test.
+    root = tmp_path / "work"
+    root.mkdir()
+    ev.build_run_folder(root, "HEAD", ev.base_commit(), case, trusted=ev.base_commit())
+    for p in ev.TRUSTED_PATHS:
+        tracked = ev.git("ls-tree", "-r", "--name-only", ev.base_commit(), "--", p, cwd=ev.REPO_ROOT).split()
+        for f in tracked:
+            assert (root / f).read_text() == ev.git("show", f"{ev.base_commit()}:{f}", cwd=ev.REPO_ROOT)
+    assert ".claude/settings.json" in ev.TRUSTED_PATHS and ".claude/hooks" in ev.TRUSTED_PATHS
 
 
 def test_review_input_like_collect_inputs(folder):

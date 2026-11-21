@@ -36,12 +36,11 @@ for offline tools only and is never shipped (D23). Packages: pytest only, pinned
 | E1 ✅ | Save the logs | A private repo, `logic-lane-archive`, keeps a raw copy of every Actions run with its full log, and every issue and PR with comments, events, labels, commits, files and reviews (D24). A scheduled workflow there collects what's new: daily, weekly after 2026-12-20 (it opens a reminder issue). It goes red if a log GitHub still has is missing, or something failed to download. GitHub deletes logs after 90 days, so this keeps them. No packages needed | 15 min (token) | ~5 h |
 | E2a | Eval setup | Decisions (D25), Python with pytest pinned by uv in `tools/eval/`, your local setup from its README | ~1.5 h | ~2 h |
 | E2b ✅ | Eval by hand | 12 test changes (8 planted bugs, 4 clean; 3 hidden) on a fixed base commit. One command runs the real code reviewer on each, 3 times, exactly as on GitHub, and scores bugs caught, false alarms and cost. Claude writes it all (you chose automation, 2026-11-21) | ~1 h | ~20–25 h |
-| E2c | Eval on its own | Runs when the agent rules, prompts or model changed (daily check), and on PRs that change agent rules | — | ~3 h |
+| E2c | Eval on its own | On GitHub (D26): daily when the agent rules, the code-review job, the cases or the model changed (a tiny daily probe checks the model), after the AI review on PRs that change agent rules (one comment), and by hand. `AI_EVAL` switch. CI runs the eval's Python tests. Ticked once proven on main | — | ~5 h |
 | E2d | Rule fixes | When a miss repeats, an agent proposes a rule change; a script opens the PR (D25); the eval re-runs it on all cases, hidden ones included; you merge. Max 2 tries, then `needs-you` | ~1 h | 6–10 h |
 
-E2a and E2b are settled in D25. Still to decide: in E2c, whether Python may run in this repo's workflows (it would
-amend D23), GitHub switching off scheduled workflows after 60 days without activity in a public repo, a slower
-schedule from about 2026-12-20, an off switch like `AI_FIX` (D17) to protect the Max quota, and which model the GitHub review uses (GitHub's logs don't show it; the eval ran claude-sonnet-5-5). In E2d: how the rule-fix agent's checkout leaves
+E2a and E2b are settled in D25, E2c in D26 (Python in workflows: D23). The daily check stays daily: it only runs
+the full eval when something changed, so no slower schedule is needed. Still to decide in E2d: how the rule-fix agent's checkout leaves
 out `tools/eval/cases-hidden/` and its history (e.g. a copy without `tools/eval/`, or the hidden cases in E1's
 private archive). After the first
 baseline: the one change to compare (e.g. the model). Later, if wanted: rebuild the pipeline's numbers from E1's
