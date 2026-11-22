@@ -52,6 +52,7 @@ jobs:
       branch: ${{ steps.state.outputs.branch }}
       sha: ${{ steps.state.outputs.sha }}
       result: ${{ steps.state.outputs.result }}
+      said: ${{ steps.state.outputs.said }}
       main: ${{ steps.state.outputs.main }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,7 +90,7 @@ jobs:
             | {number, sha: .head.sha, ref: .head.ref, labels: [.labels[].name]}]' > "$d/open.json"
           rules=$(cd tools/eval && python3 -c 'import eval_review as e; print(" ".join(e.RULE_PATHS))')
           echo '[]' > "$d/prs.json"
-          for row in $(jq -c '.[]' "$d/open.json"); do
+          jq -c '.[]' "$d/open.json" | while read -r row; do
             n=$(jq -r .number <<<"$row"); sha=$(jq -r .sha <<<"$row")
             git fetch -q origin "$sha" 2>/dev/null || git fetch -q origin "pull/${n}/head"
             head_date=$(git show -s --format=%cI "$sha")
@@ -112,7 +113,7 @@ jobs:
             --main-fp "$fp" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --case "$IN_CASE") > "$RUNNER_TEMP/state.json"
           jq . "$RUNNER_TEMP/state.json"
           jq -r --arg m "$main" --arg fp "$fp" '"action=\(.action)", "case=\(.case // "")", "pr=\(.pr // "")",
-            "branch=\(.ref // "")", "sha=\(.sha // "")", "result=\(.result // "")", "main=\($m)", "fp=\($fp)"' \
+            "branch=\(.ref // "")", "sha=\(.sha // "")", "result=\(.result // "")", "said=\(.said // "")", "main=\($m)", "fp=\($fp)"' \
             "$RUNNER_TEMP/state.json" >> "$GITHUB_OUTPUT"
           echo "Rule fix: $(jq -r '.action + " " + (.case // "") + " " + (.why // "")' "$RUNNER_TEMP/state.json")" >> "$GITHUB_STEP_SUMMARY"
           echo "$fp" > "$RUNNER_TEMP/fp"
@@ -211,15 +212,23 @@ jobs:
           SHA: ${{ needs.decide.outputs.sha }}
           MAIN: ${{ needs.decide.outputs.main }}
           RESULT: ${{ needs.decide.outputs.result }}
+          SAID: ${{ needs.decide.outputs.said }}
         run: |
           set -euo pipefail
           ref=$MAIN
           if [ "$ACTION" = retry ]; then git fetch -q origin "$SHA"; ref=$SHA; fi
-          # Main's eval result: its visible numbers and what the reviewer said on the missed case.
+          # Main's eval result: its visible numbers. What the reviewer said on the missed case comes from the same
+          # eval on try 1, and from the PR's own eval on try 2 (so it learns from what try 1's rules did).
           gh api "repos/${REPO}/actions/artifacts/${RESULT}/zip" > "$RUNNER_TEMP/main.zip"
           unzip -q -o "$RUNNER_TEMP/main.zip" results.json details.json -d "$RUNNER_TEMP/main"
+          details="$RUNNER_TEMP/main/details.json"
+          if [ -n "$SAID" ]; then
+            gh api "repos/${REPO}/actions/artifacts/${SAID}/zip" > "$RUNNER_TEMP/said.zip"
+            unzip -q -o "$RUNNER_TEMP/said.zip" details.json -d "$RUNNER_TEMP/said"
+            details="$RUNNER_TEMP/said/details.json"
+          fi
           cd tools/eval
-          python3 rule_fix.py copy --ref "$ref" --main "$MAIN" --case "$CASE" --details "$RUNNER_TEMP/main/details.json" \
+          python3 rule_fix.py copy --ref "$ref" --main "$MAIN" --case "$CASE" --details "$details" \
             --main-results "$RUNNER_TEMP/main/results.json" --failed "$(jq -r '.reasons[]?' "$RUNNER_TEMP/state.json")" \
             --out "$RUNNER_TEMP/copy"
           tar -czf "$RUNNER_TEMP/copy.tgz" -C "$RUNNER_TEMP/copy" .
@@ -277,7 +286,7 @@ jobs:
           claude_args: >-
             --max-turns 40
             --allowedTools "Read,Glob,Grep,Edit(./docs/REVIEW-CHECKLIST.md),Edit(./tools/review/prompts/code.md),Edit(./fix-input/why.md)"
-            --disallowedTools "Bash,WebFetch,WebSearch,Task,Agent,Skill,SlashCommand,NotebookEdit,Read(//proc/**),Read(//sys/**)"
+            --disallowedTools "Bash,WebFetch,WebSearch,Task,Agent,Skill,SlashCommand,NotebookEdit,Read(//proc/**),Read(//sys/**),Read(//home/runner/work/_temp/**),Read(//home/runner/work/_actions/**),Read(//home/runner/.claude/**),Read(//home/runner/runners/**),Read(//home/runner/actions-runner/**)"
       # Only the folder goes back, never .git. The push job checks every file against the copy.
       - name: Hand back the folder
         if: ${{ always() && steps.claude.outcome != 'skipped' }}
@@ -329,6 +338,7 @@ jobs:
           PR: ${{ needs.decide.outputs.pr }}
           SHA: ${{ needs.decide.outputs.sha }}
           OLD_BRANCH: ${{ needs.decide.outputs.branch }}
+          MAIN: ${{ needs.decide.outputs.main }}
           RUN_ID: ${{ github.run_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -336,7 +346,7 @@ jobs:
           set +x
           if [ "$ACTION" = try ]; then
             branch="rule-fix/${CASE}-${RUN_ID}"
-            git switch -q -c "$branch" origin/main
+            git switch -q -c "$branch" "$MAIN" # the main the AI's copy came from, never a newer one
           else
             branch=$OLD_BRANCH
             [[ "$branch" =~ ^rule-fix/[a-z][0-9]{2}-[0-9]+$ ]] || { echo "::error::Not a rule-fix branch."; exit 1; }
@@ -349,7 +359,7 @@ jobs:
           while read -r f; do
             [ -n "$f" ] && cp "$RUNNER_TEMP/changes/$f" "$f" && git add -- "$f"
           done < "$RUNNER_TEMP/changed.txt"
-          git -c user.name='claude[bot]' -c user.email=noreply@anthropic.com commit -q \
+          git -c user.name='Logic Lane rule fix' -c user.email=noreply@example.invalid commit -q \
             -m "Rule fix: the code reviewer should block what case ${CASE} plants (try $([ "$ACTION" = try ] && echo 1 || echo 2))" \
             -m "Written by the rule-fix workflow (D27). Run: ${RUN_URL}"
           # The Claude app token, the same way the pinned action gets it (src/github/token.ts): an OIDC token for
@@ -390,8 +400,12 @@ jobs:
               echo
               echo "@constantinospan: you decide. Merge it, change it by hand, or close it. [The run](${RUN_URL})"
             } > "$RUNNER_TEMP/body.md"
-            gh pr create --repo "$REPO" --base main --head "$branch" --title "Rule fix: the reviewer misses case ${CASE}" \
-              --body-file "$RUNNER_TEMP/body.md" --label rule-fix --label rule-fix-try-1
+            # No half results: a branch without its labelled PR would be invisible to the next runs.
+            if ! gh pr create --repo "$REPO" --base main --head "$branch" --title "Rule fix: the reviewer misses case ${CASE}" \
+                 --body-file "$RUNNER_TEMP/body.md" --label rule-fix --label rule-fix-try-1; then
+              git -c http.extraheader="$auth" push -q --delete "https://github.com/${REPO}.git" "$branch" || true
+              echo "::error::Couldn't open the PR, so the branch was deleted again."; exit 1
+            fi
           else
             { echo "Try 2 pushed. Why (written by the rule-fix AI):"; echo; cat "$RUNNER_TEMP/changes/why.md"; } > "$RUNNER_TEMP/body.md"
             gh pr comment "$PR" --repo "$REPO" --body-file "$RUNNER_TEMP/body.md"

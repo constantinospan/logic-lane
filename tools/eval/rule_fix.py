@@ -132,7 +132,14 @@ def state(results: list[dict], prs: list[dict], attempts: set[str], main_fp: str
 
     Actions: none, try (case, result), judge-pass / retry / needs-you (pr, reasons)."""
     full = [r for r in results if _full(r)]
-    mains = [r for r in full if r["meta"].get("fingerprint") == r["meta"].get("main_fingerprint")]
+    # Results stand for content, not for how they ran: after a rules PR is squash-merged, main has the PR's
+    # fingerprint and its daily eval is skipped, so the PR's own eval is main's. A fingerprint main had (now or as
+    # some eval's main) is a main state; keep the newest result of each, newest first.
+    fps = {main_fp} | {r["meta"].get("main_fingerprint") for r in full}
+    newest: dict[str, dict] = {}
+    for r in full:
+        newest.setdefault(r["meta"].get("fingerprint"), r)
+    mains = [r for fp, r in newest.items() if fp in fps]
     if prs:
         pr = sorted(prs, key=lambda x: x["number"])[0]
         m = BRANCH.match(pr["ref"])
@@ -140,6 +147,9 @@ def state(results: list[dict], prs: list[dict], attempts: set[str], main_fp: str
         if case:
             return {"action": "none", "why": f"rule-fix PR #{pr['number']} is still open"}
         if pr["sha"] in pr.get("judged", []):
+            labels = pr.get("labels", [])
+            if "rule-fix-try-2" in labels and "needs-you" not in labels:  # try 2 started but pushed nothing
+                return {**base, "action": "needs-you", "reasons": ["try 2 didn't push a change"]}
             return {"action": "none", "why": "already judged"}
         if not m:
             return {**base, "action": "needs-you", "reasons": ["the branch name isn't a rule-fix branch"]}
@@ -151,7 +161,7 @@ def state(results: list[dict], prs: list[dict], attempts: set[str], main_fp: str
             if _hours(pr["head_date"], now) >= WAIT_HOURS:
                 return {**base, "action": "needs-you", "reasons": ["no clean eval came for this commit"]}
             return {"action": "none", "why": "waiting for the PR's eval"}
-        ref = [r for r in mains if r["meta"]["fingerprint"] == mine[0]["meta"].get("main_fingerprint")]
+        ref = [r for r in full if r["meta"].get("fingerprint") == mine[0]["meta"].get("main_fingerprint")]
         if not ref:
             return {**base, "action": "needs-you", "reasons": ["there's no eval of main to compare with"]}
         ok, reasons = judge(mine[0], ref[0], base["case"])
@@ -159,7 +169,9 @@ def state(results: list[dict], prs: list[dict], attempts: set[str], main_fp: str
             return {**base, "action": "judge-pass", "reasons": []}
         if "rule-fix-try-2" in pr.get("labels", []):
             return {**base, "action": "needs-you", "reasons": reasons}
-        return {**base, "action": "retry", "reasons": reasons, "result": ref[0]["artifact"]["id"]}
+        # Main's numbers to compare with; what the reviewer said comes from the PR's own eval (try 1's rules).
+        return {**base, "action": "retry", "reasons": reasons, "result": ref[0]["artifact"]["id"],
+                "said": mine[0]["artifact"]["id"]}
     if not mains:
         return {"action": "none", "why": "no full eval of main yet"}
     if case:
@@ -287,6 +299,8 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
 
 def sanitise(text: str) -> str:
     """AI text for a PR body: no mentions, no issue-closing keywords, no secrets, short."""
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "[picture removed]", text)  # nothing loads from elsewhere
+    text = re.sub(r"\[([^\]]*)\]\(([^)]*)\)", r"\1", text)  # links: just their text
     text = text.replace("@", "@​")
     text = re.sub(r"(?i)\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\b(\s*:?\s*)#", r"\1\3#​", text)
     text = SECRETS.sub("[removed]", text)

@@ -464,7 +464,8 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   is a small sample, so the comment says "looks better", never "fixed".
 - **Tries:** at most 2 per PR (labels `rule-fix-try-1`, `rule-fix-try-2`, set before the AI runs), then
   `needs-you`. One rule-fix PR at a time. Each try is recorded before the AI starts, so a case is tried at most
-  once for main as it is (closed PRs aren't reopened). No eval within 4 hours, or main's rules moved on since the
+  once for main as it is (closed PRs aren't reopened; the marker is kept 90 days, so after that the same case may
+  be tried once more). No eval within 4 hours, or main's rules moved on since the
   branch was made: `needs-you`.
 - **Works from the repo's state:** the workflow runs after every eval, plus daily, and decides from the open
   rule-fix PRs, the saved eval results and the markers, never from one event. So a lost or repeated event can't

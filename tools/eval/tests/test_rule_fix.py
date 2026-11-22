@@ -240,3 +240,29 @@ def test_state_waits_for_the_prs_eval_then_gives_up():
     assert rf.state([old_eval, main], [pr()], set(), "F1", NOW)["action"] == "none"  # 1 h: wait
     late = rf.state([old_eval, main], [pr(head_date="2026-11-24T03:00:00Z")], set(), "F1", NOW)
     assert late["action"] == "needs-you" and "no clean eval" in late["reasons"][0]
+
+
+def test_state_after_a_rules_pr_is_merged_uses_the_prs_eval_as_mains():
+    old = ev_result("F1", "F1", MISS, aid=1, when="2026-11-20T06:40:00Z")
+    merged = ev_result("F2", "F1", MISS, mode="pr", number="9", rules="p", aid=2, when="2026-11-22T10:00:00Z")
+    assert rf.state([merged, old], [], set(), "F2", NOW) == {"action": "try", "case": "b04", "result": 2}
+    dup = ev_result("F2", "F2", MISS, mode="hand", aid=3, when="2026-11-23T10:00:00Z")  # same content again
+    assert rf.state([dup, merged, old], [], set(), "F2", NOW)["result"] == 3
+    assert rf.state([dup, merged], [], set(), "F2", NOW)["action"] == "none"  # one main state only
+    # The PR's eval is judged against the merged one as main.
+    good = ev_result("P1", "F2", GOOD, mode="pr", number="70", rules="s1", aid=5, when="2026-11-24T07:30:00Z")
+    assert rf.state([good, merged, old], [pr()], set(), "F2", NOW)["action"] == "judge-pass"
+
+
+def test_state_retry_learns_from_the_prs_eval_and_a_silent_try_2_goes_to_the_owner():
+    main = ev_result("F1", "F1", MISS, aid=1)
+    bad = ev_result("P1", "F1", MISS, mode="pr", number="70", rules="s1", aid=5, when="2026-11-24T07:30:00Z")
+    r = rf.state([bad, main], [pr()], set(), "F1", NOW)
+    assert r["result"] == 1 and r["said"] == 5
+    two = ["rule-fix", "rule-fix-try-1", "rule-fix-try-2"]
+    assert rf.state([bad, main], [pr(judged=["s1"], labels=two)], set(), "F1", NOW)["action"] == "needs-you"
+    assert rf.state([bad, main], [pr(judged=["s1"], labels=two + ["needs-you"])], set(), "F1", NOW)["action"] == "none"
+
+
+def test_sanitise_drops_pictures_and_links():
+    assert rf.sanitise("see ![x](https://evil/p.png) and [docs](https://evil)") == "see [picture removed] and docs"
