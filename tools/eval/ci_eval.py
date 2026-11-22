@@ -74,12 +74,12 @@ def _object(commit: str, path: str) -> str:
 def fingerprint(rules: str, main: str, model: str, spec: str = "all/3") -> str:
     """Content, never commit SHAs, so a squash-merged PR gets main's fingerprint. `spec` (cases/runs) keeps a small
     run by hand from ever standing in for a full one."""
-    yml = ev.at_commit(rules, ev.REVIEW_YML)
     parts = [f"rules {p} {_object(rules, p)}" for p in ev.RULE_PATHS]
     parts += [f"trusted {p} {_object(main, p)}" for p in ev.TRUSTED_PATHS]
     parts += [f"eval {p} {_object(main, p)}" for p in EVAL_FILES]
-    parts += ["code-review " + hashlib.sha256(ev._job_block(yml, "code-review").encode()).hexdigest(),
-              f"model {model}", f"spec {spec}"]
+    parts += [f"code-review {c} " + hashlib.sha256(ev._job_block(ev.at_commit(c, ev.REVIEW_YML), "code-review")
+                                                  .encode()).hexdigest() for c in (rules, main)]  # prompt; tools
+    parts += [f"model {model}", f"spec {spec}"]
     return hashlib.sha256("\n".join(parts).encode()).hexdigest()[:20]
 
 
@@ -103,7 +103,10 @@ def leaks(folder: Path) -> list[str]:
 
 def prepare(rules: str, main: str, plan: dict, out: Path) -> None:
     """out/<folder>/work: the run folder. out/<folder>/run.json: what the review job passes to the action."""
-    settings = ev.read_review_settings(ev.at_commit(rules, ev.REVIEW_YML))
+    # The prompt is the rules commit's (it's part of what's tested). The tool limits, turns and env are always
+    # main's: the run holds the login token, so rules under test (maybe a builder PR's) never widen what it may do.
+    settings = {**ev.read_review_settings(ev.at_commit(main, ev.REVIEW_YML)),
+                "prompt": ev.read_review_settings(ev.at_commit(rules, ev.REVIEW_YML))["prompt"]}
     schema = json.dumps(json.loads(ev.at_commit(rules, ev.SCHEMA)), separators=(",", ":"))
     base = ev.base_commit()
     folders = {s["case"]: s["folder"] for s in plan["slots"].values()}

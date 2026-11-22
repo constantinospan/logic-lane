@@ -10,7 +10,7 @@
 #
 # Security (public repo): like review.yml. workflow_run and schedule always use main's copy of this file. Reviewer
 # jobs get a read-only token, never check out this repo (so the cases' answers aren't on that machine), and get
-# .claude/settings, hooks and .mcp.json from main, never from the rules being tested. Only the comment job (no
+# .claude/settings, hooks, .mcp.json and the review's tool limits from main, never from the rules being tested. Only the comment job (no
 # Claude) can write, and only a PR comment. Keep show_full_output off (logs are public).
 name: Eval
 
@@ -35,14 +35,15 @@ on:
 permissions: {} # every job asks for what it needs
 
 concurrency:
-  # One eval per PR branch of this repo (a newer push replaces it). Main's (daily, by hand) never stops halfway.
+  # One eval at a time per PR branch of this repo, and one for main (daily, by hand). None is ever cancelled
+  # halfway: a newer one waits (only the latest waits), then usually skips because the first one saved its result.
   # Anything else that finishes CI (main's own pushes, fork PRs, manual CI runs) gets a group of its own, so it can
   # never cancel a running eval.
   group: >-
     eval-${{ github.event_name != 'workflow_run' && 'main' ||
     (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.head_repository.full_name == github.repository)
     && format('pr-{0}', github.event.workflow_run.head_branch) || format('skip-{0}', github.run_id) }}
-  cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
+  cancel-in-progress: false
 
 jobs:
   plan:
@@ -303,11 +304,12 @@ jobs:
           git add -A
           git -c user.name=eval -c user.email=noreply@example.invalid commit -q -m main
           sha256sum CLAUDE.md > "$RUNNER_TEMP/claude-md.sha"
-          # The code-review job's env from the rules commit's review.yml (only CLAUDE_CODE_* names, checked by ci_eval.py).
+          # The code-review job's env from main's review.yml (only CLAUDE_CODE_* names, checked by ci_eval.py).
           jq -r '.env | to_entries[] | "\(.key)=\(.value)"' "$RUNNER_TEMP/case/run.json" >> "$GITHUB_ENV"
           {
-            echo "prompt<<EOF_PROMPT"; jq -r .prompt "$RUNNER_TEMP/case/run.json"; echo "EOF_PROMPT"
-            echo "claude_args<<EOF_ARGS"; jq -r .claude_args "$RUNNER_TEMP/case/run.json"; echo "EOF_ARGS"
+            eof="EOF_$(openssl rand -hex 16)" # random, so no prompt text can end the value early
+            echo "prompt<<$eof"; jq -r .prompt "$RUNNER_TEMP/case/run.json"; echo "$eof"
+            echo "claude_args<<$eof"; jq -r .claude_args "$RUNNER_TEMP/case/run.json"; echo "$eof"
           } >> "$GITHUB_OUTPUT"
           rm -rf "$RUNNER_TEMP/case"
       - name: Sandbox for Claude's commands

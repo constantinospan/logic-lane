@@ -130,3 +130,21 @@ def test_record_handles_string_output_and_errors():
     r = ci_eval.record({"result": result(is_error=True, subtype="error_max_turns")}, case, 1)
     assert r["error"] == "error: error_max_turns"
     assert ci_eval.record({}, case, 2)["error"] == "no result"
+
+
+def test_tool_limits_always_come_from_main(tmp_path, monkeypatch):
+    real = ev.read_review_settings
+    def rules_widen_tools(yml):  # the rules under test ask for every tool
+        s = real(yml)
+        return {**s, "allowed": "Bash(*)", "max_turns": 999} if "WIDE" in yml else s
+    monkeypatch.setattr(ev, "read_review_settings", rules_widen_tools)
+    at = ev.at_commit
+    rules = "HEAD^{commit}"  # the same commit under another name, standing in for a PR's rules
+    monkeypatch.setattr(ev, "at_commit", lambda c, p: at(c, p) + ("\n# WIDE\n" if c == rules and p == ev.REVIEW_YML else ""))
+    plan = ci_eval.slots("b05", 1, salt="x")
+    ci_eval.prepare(rules, HEAD, plan, tmp_path)
+    run = json.loads((tmp_path / plan["slots"]["01"]["folder"] / "run.json").read_text())
+    args = shlex.split(run["claude_args"])
+    main = real(ev.REVIEW_YML.read_text(encoding="utf-8"))
+    assert args[args.index("--allowedTools") + 1] == main["allowed"] != "Bash(*)"
+    assert args[args.index("--max-turns") + 1] == str(main["max_turns"])

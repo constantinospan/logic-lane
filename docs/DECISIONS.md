@@ -423,7 +423,8 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   work even when it's off. A full eval is 36 reviews.
 - **No answers on the reviewer's machine:** a job without Claude builds the run folders. The review jobs never
   check out this repo. `.claude/` settings, hooks and `.mcp.json` always come from main, never from the rules
-  being tested, because they run next to the login token.
+  being tested, because they run next to the login token. So do the review's allowed tools, turn limit and env:
+  only its prompt comes from the rules being tested. Changes to those aren't evaluated.
 - **Results:**
   - On a PR, one comment with the PR's numbers and main's for comparison.
   - Daily and by-hand runs show the report on the run's page and keep it as a run file (90 days).
