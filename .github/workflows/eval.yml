@@ -69,7 +69,7 @@ jobs:
       cases: ${{ steps.what.outputs.cases }}
       runs: ${{ steps.what.outputs.runs }}
       matrix: ${{ steps.what.outputs.matrix }}
-      slots: ${{ steps.what.outputs.slots }}
+      folders: ${{ steps.what.outputs.folders }} # slot -> folder only: never which case (that map is a file, see below)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -121,7 +121,7 @@ jobs:
           {
             echo "mode=$mode"; echo "number=$number"; echo "rounds=$rounds"; echo "rules=$rules"; echo "main=$main"
             echo "cases=$cases"; echo "runs=$runs"; echo "go=true"
-            echo "matrix=$(jq -c .matrix "$RUNNER_TEMP/slots.json")"; echo "slots=$(jq -c .slots "$RUNNER_TEMP/slots.json")"
+            echo "matrix=$(jq -c .matrix "$RUNNER_TEMP/slots.json")"; echo "folders=$(jq -c '.slots | map_values(.folder)' "$RUNNER_TEMP/slots.json")"
           } >> "$GITHUB_OUTPUT"
           echo "Eval: $mode, rules $rules, cases $cases, $runs run(s) each" >> "$GITHUB_STEP_SUMMARY"
       # After the real review, not alongside it, so the eval never competes with it for the Claude plan's limits.
@@ -168,6 +168,14 @@ jobs:
         with:
           name: case-folders
           path: ${{ runner.temp }}/up/
+          retention-days: 1
+      # Which slot is which case: only the report job reads it. Never a job output or env, because the public log
+      # prints those. The report job deletes it and the per-run files once scored.
+      - if: ${{ steps.what.outputs.go == 'true' && steps.wait.outputs.skip != 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eval-plan
+          path: ${{ runner.temp }}/slots.json
           retention-days: 1
 
   # Which model the action uses today: one tiny message, no tools.
@@ -291,7 +299,7 @@ jobs:
       - name: The run folder
         id: run
         env:
-          FOLDER: ${{ fromJSON(needs.plan.outputs.slots)[matrix.slot].folder }}
+          FOLDER: ${{ fromJSON(needs.plan.outputs.folders)[matrix.slot] }}
         run: |
           set -euo pipefail
           mkdir "$RUNNER_TEMP/case"
@@ -357,6 +365,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: write # only to delete this run's per-run files once scored
     outputs:
       errors: ${{ steps.score.outputs.errors }}
     steps:
@@ -368,16 +377,18 @@ jobs:
         with:
           pattern: run-*
           path: ${{ runner.temp }}/runs
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: eval-plan
+          path: ${{ runner.temp }}/plan
       - name: Score
         id: score
         env:
-          SLOTS: ${{ needs.plan.outputs.slots }}
           FP: ${{ needs.decide.outputs.fingerprint }}
         run: |
           mkdir -p "$RUNNER_TEMP/runs" "$RUNNER_TEMP/result"
-          printf '%s' "$SLOTS" | jq '{slots: .}' > "$RUNNER_TEMP/slots.json"
           cd tools/eval
-          if python3 ci_eval.py report --runs "$RUNNER_TEMP/runs" --slots "$RUNNER_TEMP/slots.json" --out "$RUNNER_TEMP/result" \
+          if python3 ci_eval.py report --runs "$RUNNER_TEMP/runs" --slots "$RUNNER_TEMP/plan/slots.json" --out "$RUNNER_TEMP/result" \
                --action "claude-code-action v1.0.265" > /dev/null; then errors=0; else errors=1; fi
           if [ ! -s "$RUNNER_TEMP/result/report.md" ]; then
             printf '## Eval report\n\nThe scoring script failed, so there are no numbers. See the run.\n' > "$RUNNER_TEMP/result/report.md"
@@ -401,6 +412,17 @@ jobs:
         run: |
           echo "::error::Some review runs errored or gave no result. See the report above."
           exit 1
+      # Per-run findings plus the slot map would tie findings to hidden cases, so they go as soon as they're scored.
+      - name: Delete the per-run files
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.run_id }}
+        run: |
+          gh api --paginate "repos/${REPO}/actions/runs/${RUN}/artifacts" \
+            --jq '.artifacts[] | select(.name | test("^(run-[0-9]+|eval-plan|case-folders)$")) | .id' |
+            while read -r id; do gh api -X DELETE "repos/${REPO}/actions/artifacts/${id}"; done
 
   comment:
     needs: [plan, decide, report]

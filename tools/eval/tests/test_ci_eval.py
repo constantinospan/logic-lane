@@ -66,7 +66,8 @@ def test_claude_args_read_back_like_the_job():
 
 def test_job_env_keeps_only_claude_code_settings():
     assert ci_eval.job_env({"env": {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1", "GH_TOKEN": "x",
-                                    "CLAUDE_CODE_X": "$(boom)"}}) == {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}
+                                    "CLAUDE_CODE_X": "$(boom)", "CLAUDE_CODE_Y\nPATH": "1",
+                                    "CLAUDE_CODE_Z=": "1"}}) == {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}
     s = ev.read_review_settings(ev.REVIEW_YML.read_text(encoding="utf-8"))
     assert ci_eval.job_env(s) == {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}
 

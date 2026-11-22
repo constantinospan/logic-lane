@@ -419,8 +419,8 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   saved under it for 90 days.
 - **Model:** the review job doesn't pin one, so a tiny daily probe through the same action asks which model
   answers (owner's choice). review.yml is unchanged.
-- **Switch:** `AI_EVAL=on` (repo variable), like `AI_FIX` (D17). On from the start (owner's choice); runs by hand
-  work even when it's off. A full eval is 36 reviews.
+- **Switch:** `AI_EVAL=on` (repo variable), like `AI_FIX` (D17). The owner chose on from the start: it's set once the first
+  run by hand passes on main, because the workflow can't run before it's merged. Runs by hand work even when it's off. A full eval is 36 reviews.
 - **No answers on the reviewer's machine:** a job without Claude builds the run folders. The review jobs never
   check out this repo. `.claude/` settings, hooks and `.mcp.json` always come from main, never from the rules
   being tested, because they run next to the login token. So do the review's allowed tools, turn limit and env:
@@ -428,7 +428,8 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 - **Results:**
   - On a PR, one comment with the PR's numbers and main's for comparison.
   - Daily and by-hand runs show the report on the run's page and keep it as a run file (90 days).
-  - Nothing is committed. Hidden cases only appear as combined numbers: job and file names use anonymous slots.
+  - Nothing is committed. Hidden cases only appear as combined numbers: job and file names use anonymous slots,
+    and the per-run files and the slot map are deleted as soon as they're scored.
 - **Information only:** never a required check, and a low score never turns a run red. A run goes red only when
   reviews error or give no result, so GitHub emails the owner.
 - **60-day switch-off:** GitHub pauses scheduled workflows in a public repo after 60 days without activity. No

@@ -91,7 +91,8 @@ def claude_args(settings: dict, schema: str) -> str:
 
 
 def job_env(settings: dict) -> dict:
-    return {k: v for k, v in settings["env"].items() if k.startswith(ENV_ALLOWED) and v.replace("_", "").isalnum()}
+    ok = lambda x: x.replace("_", "").isalnum() and x.isascii()  # noqa: E731
+    return {k: v for k, v in settings["env"].items() if k.startswith(ENV_ALLOWED) and ok(k) and ok(v)}
 
 
 def leaks(folder: Path) -> list[str]:
