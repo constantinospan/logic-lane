@@ -58,9 +58,12 @@ def cost(record: dict) -> dict:
 
 
 def models(record: dict) -> list[str]:
-    """The models a run used, from the raw answer."""
+    """The models a run used, from the raw answer, the one that cost most first (Claude Code also uses a small model
+    for side steps)."""
     raw = record.get("raw") if isinstance(record.get("raw"), dict) else {}
-    return sorted(raw.get("modelUsage") or {})
+    usage = raw.get("modelUsage") or {}
+    cost = lambda m: usage[m].get("costUSD", 0) if isinstance(usage[m], dict) else 0  # noqa: E731
+    return sorted(usage, key=lambda m: (-cost(m), m))
 
 
 # ---------- Scoring one run ----------
@@ -115,10 +118,12 @@ def _count(runs: list[dict], outcome: str) -> int:
 def report(scored: list[dict], meta: dict) -> str:
     """A short markdown report of a whole eval: a table per visible case, one combined line for the hidden cases
     (counts only, never their ids, so nothing about a single hidden case leaks), and totals over every run."""
-    used = sorted({m for s in scored for m in s.get("models", [])})
+    main = sorted({s["models"][0] for s in scored if s.get("models")})
+    side = sorted({m for s in scored for m in s.get("models", [])[1:]} - set(main))
+    model = (", ".join(main) or "unknown") + (f" (side steps: {', '.join(side)})" if side else "")
     lines = ["## Eval report", "",
              f"Claude Code: {meta['local_cli']} (GitHub: {meta['action_cli']})",
-             f"Model: {', '.join(used) or 'unknown'}", "",
+             f"Model: {model}", "",
              "| Case | Kind | Runs | Caught | Missed | Weak | False alarms | Errors |",
              "|---|---|---|---|---|---|---|---|"]
 
@@ -150,5 +155,5 @@ def report(scored: list[dict], meta: dict) -> str:
               f"Blocked tool calls: {sum(s['denials'] for s in scored)} in "
               f"{sum(1 for s in scored if s['denials'])} runs",
               f"Cost: ${sum(s['cost_usd'] for s in scored):.2f}, turns: {sum(s['turns'] for s in scored)}, "
-              f"time: {round(sum(s['seconds'] for s in scored) / 60)} min"]
+              f"time: {sum(s['seconds'] for s in scored) / 60:.1f} min"]
     return "\n".join(lines) + "\n"
