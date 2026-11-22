@@ -146,7 +146,8 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
   without a way to ask), so widen the list if the builder gets stuck. Owner-only triggering is the main boundary.
 - Install via the Claude GitHub App (`/install-github-app`). Its pushes trigger other workflows; the default
   GITHUB_TOKEN would NOT, so never rely on GITHUB_TOKEN for pushes that must trigger review/deploy.
-- The action pushes a branch and posts a "Create PR" link (one tap); it does not open PRs itself by default.
+- The action pushes a branch and posts a "Create PR" link (one tap); it does not open PRs itself by default. The
+  one exception: the rule-fix workflow's script (not an AI) opens rule-fix PRs as the Claude app (D27).
 - The action cannot edit `.github/workflows/*`. Pipeline changes go through a local session, or by hand
   (claude.ai/code may share the same limit; untested).
 - On PR runs the action restores `CLAUDE.md` and `.claude/` from the base branch; PR versions go to `.claude-pr/`.
@@ -388,19 +389,19 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 - **Realistic cases:** every case passes `npm run check`, because the real review only runs after CI is green. Cases
   only plant what the code reviewer owns (checklist §3 code items, §5, §6, bugs), and change nothing visible.
   They're stored as data (`tools/eval/cases/`), never as live site files.
-- **Hidden cases** (`tools/eval/cases-hidden/`): kept out of the rule-fix agent's working folder (E2d), so it
-  can't teach to the test. How is decided when E2d is built, since this repo is public. Reports show hidden cases
-  as counts only.
+- **Hidden cases** (`tools/eval/cases-hidden/`): kept out of the rule-fix agent's working folder, so it can't
+  teach to the test. How: D27 (a copy without `tools/eval/` and git history). Reports show hidden cases as counts
+  only.
 - **No answers for the reviewer:** the reviewer never sees any case's expected answer, hidden or not.
 - **Scoring:** caught = a Blocking finding about the planted bug. Only a Suggestion counts as missed, because the PR
   would still pass. A run that crashes or doesn't finish is an error, not a miss (like D17's ⚠️). The headline false
   alarm number is Blocking findings on clean cases. The owner can relabel any result by hand.
 - **Where it runs:** on the owner's Mac, by hand, with results kept locally (not committed). It also runs by itself
   on GitHub (D26).
-- **Rule-fix PRs (E2d, owner 2026-11-21):** the rule-fix agent only pushes its branch. A plain script step in the
-  workflow, not the AI, then opens the PR, with an @mention of the owner and a `rule-fix` label. The AI never gets
-  permission to open PRs, and the owner always merges by hand. This is the one exception to D15's "Create PR link";
-  D15 and `CLAUDE.md` are updated when E2d is built.
+- **Rule-fix PRs (E2d, owner 2026-11-21):** the rule-fix agent never writes to GitHub. A plain script step in the
+  workflow, not the AI, pushes its change and opens the PR, with an @mention of the owner and a `rule-fix` label. The AI never gets
+  permission to open PRs, and the owner always merges by hand. This is the one exception to D15's "Create PR link"
+  (D27).
 - **Packages:** pytest only (D23), plus the few packages pytest itself needs, all pinned exactly in
   `tools/eval/uv.lock`. uv ignores releases newer than a fixed
   date in `pyproject.toml`, the same "at least 2 weeks old" rule as for GitHub actions.
@@ -434,3 +435,40 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   reviews error or give no result, so GitHub emails the owner.
 - **60-day switch-off:** GitHub pauses scheduled workflows in a public repo after 60 days without activity. No
   keep-alive (that would push to main); the owner switches it back on (README).
+
+### D27. Rule fixes: the eval improves the reviewer's rules (owner, 2026-11-22, plan item E2d)
+- **What:** when the eval on main misses the same visible case twice in a row (two full evals, each with at least
+  one run where the planted problem was only a Suggestion or not raised), an AI drafts a change to the code
+  reviewer's instructions. A script opens the PR, the eval re-runs on it, and the owner decides. The owner can also
+  start one by hand for a case (Actions → Rule fix).
+- **Where:** all on GitHub Actions (`.github/workflows/rule-fix.yml`), never the owner's laptop.
+- **Hidden cases (owner's choice, 1a):** they stay in this repo. The AI gets only a copy without `tools/eval/`,
+  `.github/` and git history, built by a job without AI and checked for leaks. Its job never checks out the repo.
+  It has no shell, no web and no GitHub access, so it can't fetch them either. Feedback on a failed try never
+  gives hidden numbers.
+- **What it may change:** only `docs/REVIEW-CHECKLIST.md` and `tools/review/prompts/code.md`. A job without AI
+  checks every file it hands back (only those two, plain files, no secrets, at most 200 changed lines) before
+  anything is pushed. `CLAUDE.md`, settings, its own instructions (`tools/review/prompts/rule-fix.md`) always
+  come from main.
+- **Who writes to GitHub:** never the AI. A job without AI pushes a `rule-fix/<case>-<run>` branch and opens the
+  PR as the Claude app (so CI and the review start, D15), with the `rule-fix` label and an @mention of the owner.
+  It gets the app token the same way the pinned action does (an OIDC token exchanged at Anthropic), masked and
+  revoked after use. If that exchange ever stops working, the fallback is the owner's own GitHub App with
+  `actions/create-github-app-token` (a new action: needs the owner's OK).
+- **Reviewed like other PRs:** review.yml and eval.yml accept the owner's PRs and, as the one exception, PRs by
+  the Claude app on a `rule-fix/` branch with the `rule-fix` label. Those never get automatic code fix rounds
+  (D17); a ❌ goes to the owner (`needs-you`). `@claude` doesn't work on them (claude.yml stays owner-PR only), so
+  the owner changes them by hand or closes them.
+- **When a try passes:** on the PR's eval, the missed case is caught in every run, the other bug cases (hidden
+  ones too) aren't caught less often than on main, there are no more false alarms and no errors. 3 runs per case
+  is a small sample, so the comment says "looks better", never "fixed".
+- **Tries:** at most 2 per PR (labels `rule-fix-try-1`, `rule-fix-try-2`, set before the AI runs), then
+  `needs-you`. One rule-fix PR at a time. Each try is recorded before the AI starts, so a case is tried at most
+  once for main as it is (closed PRs aren't reopened). No eval within 4 hours, or main's rules moved on since the
+  branch was made: `needs-you`.
+- **Works from the repo's state:** the workflow runs after every eval, plus daily, and decides from the open
+  rule-fix PRs, the saved eval results and the markers, never from one event. So a lost or repeated event can't
+  skip or double a step.
+- **Switch:** `AI_RULE_FIX=on` (repo variable), like `AI_EVAL`. Runs by hand work even when it's off.
+- **Quota:** each try is about 40 reviews on the owner's plan (the eval plus the AI review). Tries only happen when
+  a miss repeats.

@@ -213,3 +213,13 @@ the `needs-you` label so the PR doesn't sit unnoticed.
 There are at most 2 fix rounds per PR, counted by the `ai-fix-1` and `ai-fix-2` labels the workflow adds. After that
 the PR gets the `needs-you` label. A fix run that skips an item on purpose writes the count to
 `review-input/skipped-count`; the workflow then adds `needs-you` and stops the automatic rounds.
+
+## Rule-fix runs (D27)
+When the eval keeps missing the same test case, `.github/workflows/rule-fix.yml` starts a rule-fix run. It:
+- works in a copy of the repo without `tools/eval/`, `.github/` and git history, and has no shell, no web and no
+  GitHub access
+- follows `tools/review/prompts/rule-fix.md` (main's), with the case in `fix-input/`
+- may only change `docs/REVIEW-CHECKLIST.md` and `tools/review/prompts/code.md`, and writes its reason to
+  `fix-input/why.md`
+
+A job without AI checks the change, pushes it and opens the PR. The owner merges or closes it.

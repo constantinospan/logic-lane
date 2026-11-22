@@ -103,14 +103,19 @@ jobs:
             workflow_run)
               mode=pr rules=$SHA
               if ! [[ "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]; then echo "::notice::Unusual branch name, no eval."; exit 0; fi
-              # The same PR lookup as review.yml's gate.
+              # The same PR lookup as review.yml's gate: the owner's PRs, or a rule-fix PR (D27: opened by the
+              # rule-fix workflow as the Claude app, on a rule-fix/ branch, with the rule-fix label).
               prs=$(gh api "repos/${REPO}/commits/${SHA}/pulls" --jq '[.[] | select(.state == "open" and .base.ref == "main"
-                and .head.ref == $ENV.BRANCH and .head.repo.full_name == $ENV.REPO and .user.login == "constantinospan")]')
+                and .head.ref == $ENV.BRANCH and .head.repo.full_name == $ENV.REPO
+                and (.user.login == "constantinospan" or (.user.login == "claude[bot]"
+                  and (.head.ref | startswith("rule-fix/")) and any(.labels[]; .name == "rule-fix"))))]')
               if [ "$(jq length <<<"$prs")" != 1 ] || [ "$(jq -r '.[0].head.sha' <<<"$prs")" != "$SHA" ]; then
-                echo "::notice::No single open PR by the owner at this commit, no eval."; exit 0
+                echo "::notice::No single open PR by the owner (or rule-fix PR) at this commit, no eval."; exit 0
               fi
               number=$(jq -r '.[0].number' <<<"$prs")
               rounds=$(jq '[.[0].labels[].name | select(. == "ai-fix-1" or . == "ai-fix-2")] | length' <<<"$prs")
+              # A rule-fix PR never gets an automatic code fix round (D27), so its eval never waits for one.
+              if [ "$(jq -r '.[0].user.login' <<<"$prs")" = "claude[bot]" ]; then rounds=2; fi
               changed=$(gh api "repos/${REPO}/pulls/${number}/files" --paginate --jq '.[].filename')
               if [ "$(python3 tools/eval/ci_eval.py trigger <<<"$changed")" != true ]; then
                 echo "::notice::The PR doesn't change what the code reviewer reads, no eval."; exit 0
@@ -242,6 +247,7 @@ jobs:
       run: ${{ steps.fp.outputs.run }}
       fingerprint: ${{ steps.fp.outputs.fingerprint }}
       main_fingerprint: ${{ steps.fp.outputs.main_fingerprint }}
+      model: ${{ needs.probe.outputs.model }} # what the fingerprints were made with (rule fixes recompute main's)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -385,11 +391,23 @@ jobs:
         id: score
         env:
           FP: ${{ needs.decide.outputs.fingerprint }}
+          MAIN_FP: ${{ needs.decide.outputs.main_fingerprint }}
+          FP_MODEL: ${{ needs.decide.outputs.model }}
+          MODE: ${{ needs.plan.outputs.mode }}
+          NUMBER: ${{ needs.plan.outputs.number }}
+          RULES: ${{ needs.plan.outputs.rules }}
+          MAIN: ${{ needs.plan.outputs.main }}
+          CASES: ${{ needs.plan.outputs.cases }}
+          RUNS: ${{ needs.plan.outputs.runs }}
         run: |
           mkdir -p "$RUNNER_TEMP/runs" "$RUNNER_TEMP/result"
+          # Which eval this was, for rule fixes (D27). On a PR the rules commit is the PR's head.
+          jq -n '{mode: env.MODE, number: env.NUMBER, rules: env.RULES, main: env.MAIN, fingerprint: env.FP,
+                  main_fingerprint: env.MAIN_FP, fp_model: env.FP_MODEL, cases: env.CASES, runs: env.RUNS,
+                  date: (now | todate)}' > "$RUNNER_TEMP/about.json"
           cd tools/eval
           if python3 ci_eval.py report --runs "$RUNNER_TEMP/runs" --slots "$RUNNER_TEMP/plan/slots.json" --out "$RUNNER_TEMP/result" \
-               --action "claude-code-action v1.0.265" > /dev/null; then errors=0; else errors=1; fi
+               --action "claude-code-action v1.0.265" --about "$RUNNER_TEMP/about.json" > /dev/null; then errors=0; else errors=1; fi
           if [ ! -s "$RUNNER_TEMP/result/report.md" ]; then
             printf '## Eval report\n\nThe scoring script failed, so there are no numbers. See the run.\n' > "$RUNNER_TEMP/result/report.md"
           fi

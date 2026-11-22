@@ -59,6 +59,7 @@ const MAX_ITEMS = 25;
  * @property {string} shotsBase  URL prefix the PNGs are served from ('' = not published).
  * @property {number} fixRounds  Fix rounds already used on this PR.
  * @property {boolean} fixOn  The AI_FIX switch.
+ * @property {boolean} [ruleFix]  A rule-fix PR (D27): never an automatic fix round.
  */
 
 /**
@@ -286,6 +287,10 @@ export function nextStep(state, input) {
     return 'Next: a reviewer stopped before finishing, so there\'s no verdict and no automatic fix. Re-run the ' +
       '**AI review** workflow from the Actions tab, or review it yourself.';
   }
+  if (input.ruleFix) {
+    return 'Next: this is a rule-fix PR (D27), so no automatic fix runs. The eval\'s comment says whether the rule ' +
+      'change helps. Change it by hand, then merge or close it.';
+  }
   if (!input.fixOn) {
     return 'Next: automatic fixes are off. Comment `@claude fix the Blocking items` on this PR, or fix by hand.';
   }
@@ -303,7 +308,7 @@ export function nextStep(state, input) {
  * @returns {boolean}
  */
 export function shouldFix(state, input) {
-  return state === 'fail' && input.fixOn && input.fixRounds < MAX_FIX_ROUNDS;
+  return state === 'fail' && input.fixOn && !input.ruleFix && input.fixRounds < MAX_FIX_ROUNDS;
 }
 
 /**
@@ -338,6 +343,7 @@ export function readInput(env) {
     shotsBase: env.SHOTS_BASE ?? '',
     fixRounds: Number(env.FIX_ROUNDS ?? '0') || 0,
     fixOn: env.AI_FIX === 'on',
+    ruleFix: env.RULE_FIX === 'true',
   };
 }
 

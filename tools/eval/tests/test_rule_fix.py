@@ -175,3 +175,68 @@ def test_report_writes_results_and_details(tmp_path):
     assert r["cases"]["b05"]["caught"] == 1 and r["meta"] == {"mode": "pr", "number": 7, "model": "claude-sonnet-5-5"}
     d = json.loads((tmp_path / "out" / "details.json").read_text())
     assert d[0]["blocking"] == ["Uses an absolute path /sw.js"]
+
+
+def ev_result(fp, main_fp, cases, mode="daily", number="", rules="m1", when="2026-11-23T06:40:00Z", aid=1,
+              hidden=None, spec=("all", "3")):
+    r = res(cases, hidden)
+    r["meta"] = {"mode": mode, "number": number, "rules": rules, "fingerprint": fp, "main_fingerprint": main_fp,
+                 "cases": spec[0], "runs": spec[1]}
+    r["artifact"] = {"id": aid, "created_at": when}
+    return r
+
+
+MISS = {"b04": ("bug", 2, 1, 0), "b05": ("bug", 3, 0, 0), "c01": ("clean", 0, 0, 0)}
+GOOD = {"b04": ("bug", 3, 0, 0), "b05": ("bug", 3, 0, 0), "c01": ("clean", 0, 0, 0)}
+NOW = "2026-11-24T08:00:00Z"
+
+
+def pr(**k):
+    return {"number": 70, "sha": "s1", "ref": "rule-fix/b04-123", "labels": ["rule-fix", "rule-fix-try-1"],
+            "head_date": "2026-11-24T07:00:00Z", "judged": [], "stale": False, **k}
+
+
+def test_state_starts_a_try_only_on_a_repeat_for_main_as_it_is_now():
+    latest = ev_result("F2", "F2", MISS, aid=2, when="2026-11-24T06:40:00Z")
+    older = ev_result("F1", "F1", MISS, aid=1)
+    assert rf.state([latest, older], [], set(), "F2", NOW) == {"action": "try", "case": "b04", "result": 2}
+    assert rf.state([latest, older], [], {"b04:F2"}, "F2", NOW)["action"] == "none"  # already tried
+    assert rf.state([latest, older], [], set(), "F3", NOW)["action"] == "none"  # main moved on: wait for its eval
+    assert rf.state([latest], [], set(), "F2", NOW)["action"] == "none"  # only one eval
+    small = ev_result("F2", "F2", MISS, aid=3, spec=("b04", "1"))
+    assert rf.state([small, older], [], set(), "F2", NOW)["action"] == "none"  # small runs don't count
+    pr_eval = ev_result("P1", "F1", MISS, mode="pr", number="9", aid=4)  # a PR's eval isn't main's
+    assert rf.state([pr_eval, older], [], set(), "F1", NOW)["action"] == "none"
+    assert rf.state([latest, ev_result("F1", "F1", GOOD)], [], set(), "F2", NOW)["action"] == "none"
+
+
+def test_state_by_hand_skips_the_repeat_check_but_not_the_rest():
+    latest = ev_result("F2", "F2", GOOD, aid=2)
+    assert rf.state([latest], [], set(), "F2", NOW, case="b04") == {"action": "try", "case": "b04", "result": 2}
+    assert rf.state([latest], [], set(), "F2", NOW, case="c01")["action"] == "none"  # clean case
+    assert rf.state([latest], [], set(), "F2", NOW, case="b03")["action"] == "none"  # hidden: not in the results
+    assert rf.state([latest], [], {"b04:F2"}, "F2", NOW, case="b04")["action"] == "none"
+    assert rf.state([latest], [pr()], set(), "F2", NOW, case="b04")["action"] == "none"  # one PR at a time
+
+
+def test_state_judges_an_open_rule_fix_pr():
+    main = ev_result("F1", "F1", MISS, aid=1)
+    good = ev_result("P1", "F1", GOOD, mode="pr", number="70", rules="s1", aid=5, when="2026-11-24T07:30:00Z")
+    bad = ev_result("P1", "F1", MISS, mode="pr", number="70", rules="s1", aid=5, when="2026-11-24T07:30:00Z")
+    assert rf.state([good, main], [pr()], set(), "F1", NOW)["action"] == "judge-pass"
+    r = rf.state([bad, main], [pr()], set(), "F1", NOW)
+    assert r["action"] == "retry" and r["case"] == "b04" and r["result"] == 1 and "caught in 2 of 3" in r["reasons"][0]
+    assert rf.state([bad, main], [pr(labels=["rule-fix", "rule-fix-try-1", "rule-fix-try-2"])], set(), "F1",
+                    NOW)["action"] == "needs-you"
+    assert rf.state([good, main], [pr(judged=["s1"])], set(), "F1", NOW)["action"] == "none"  # never twice
+    assert rf.state([good, main], [pr(stale=True)], set(), "F1", NOW)["action"] == "needs-you"
+    assert rf.state([good, main], [pr(ref="feature/x")], set(), "F1", NOW)["action"] == "needs-you"
+    assert rf.state([good], [pr()], set(), "F1", NOW)["action"] == "needs-you"  # nothing to compare with
+
+
+def test_state_waits_for_the_prs_eval_then_gives_up():
+    main = ev_result("F1", "F1", MISS, aid=1)
+    old_eval = ev_result("P0", "F1", GOOD, mode="pr", number="70", rules="s0", aid=5)  # an earlier commit's
+    assert rf.state([old_eval, main], [pr()], set(), "F1", NOW)["action"] == "none"  # 1 h: wait
+    late = rf.state([old_eval, main], [pr(head_date="2026-11-24T03:00:00Z")], set(), "F1", NOW)
+    assert late["action"] == "needs-you" and "no clean eval" in late["reasons"][0]

@@ -33,7 +33,8 @@ WHY = "fix-input/why.md"
 MAX_CHANGED_LINES = 200
 SECRETS = re.compile(r"sk-ant-|gh[pousr]_[A-Za-z0-9]{10,}|ghs_|github_pat_|-----BEGIN")
 LEFT_OUT = ("tools/eval", ".github")  # never in the copy
-FROM_MAIN = ("CLAUDE.md", *ev.TRUSTED_PATHS)  # settings and hooks run next to the token: always main's
+# Settings and hooks run next to the token, and the agent's own instructions must be main's: always from main.
+FROM_MAIN = ("CLAUDE.md", "tools/review/prompts/rule-fix.md", *ev.TRUSTED_PATHS)
 
 
 # ---------- What an eval keeps (written by ci_eval.py report) ----------
@@ -104,6 +105,75 @@ def judge(pr: dict, main: dict, case: str) -> tuple[bool, list[str]]:
     if pr["hidden"]["errors"] or any(x["errors"] for x in pr["cases"].values()):
         reasons.append("some review runs errored")
     return not reasons, reasons
+
+
+# ---------- What to do now (rule-fix.yml's decide job) ----------
+
+WAIT_HOURS = 4  # a rule-fix PR's eval should have come by then
+BRANCH = re.compile(r"^rule-fix/([a-z][0-9]{2})-[0-9]+$")
+
+
+def _full(r: dict) -> bool:
+    m = r.get("meta") or {}
+    return m.get("cases") == "all" and str(m.get("runs")) == "3"
+
+
+def _hours(since: str, now: str) -> float:
+    from datetime import datetime
+    parse = lambda t: datetime.fromisoformat(t.replace("Z", "+00:00"))  # noqa: E731
+    return (parse(now) - parse(since)).total_seconds() / 3600
+
+
+def state(results: list[dict], prs: list[dict], attempts: set[str], main_fp: str, now: str,
+          case: str | None = None) -> dict:
+    """One action from the repo's state, never from a single event (D27), so a lost or repeated event can't skip
+    or double a step. results: eval-result contents (+ "artifact" {id, created_at}), newest first. prs: open
+    rule-fix PRs {number, sha, ref, labels, head_date, judged (shas), stale}. attempts: "case:main_fp" markers.
+
+    Actions: none, try (case, result), judge-pass / retry / needs-you (pr, reasons)."""
+    full = [r for r in results if _full(r)]
+    mains = [r for r in full if r["meta"].get("fingerprint") == r["meta"].get("main_fingerprint")]
+    if prs:
+        pr = sorted(prs, key=lambda x: x["number"])[0]
+        m = BRANCH.match(pr["ref"])
+        base = {"pr": pr["number"], "ref": pr["ref"], "sha": pr["sha"], "case": m.group(1) if m else ""}
+        if case:
+            return {"action": "none", "why": f"rule-fix PR #{pr['number']} is still open"}
+        if pr["sha"] in pr.get("judged", []):
+            return {"action": "none", "why": "already judged"}
+        if not m:
+            return {**base, "action": "needs-you", "reasons": ["the branch name isn't a rule-fix branch"]}
+        if pr.get("stale"):
+            return {**base, "action": "needs-you", "reasons": ["main's rules changed since this PR was made"]}
+        mine = [r for r in full if r["meta"].get("mode") == "pr" and str(r["meta"].get("number")) == str(pr["number"])
+                and r["meta"].get("rules") == pr["sha"]]
+        if not mine:
+            if _hours(pr["head_date"], now) >= WAIT_HOURS:
+                return {**base, "action": "needs-you", "reasons": ["no clean eval came for this commit"]}
+            return {"action": "none", "why": "waiting for the PR's eval"}
+        ref = [r for r in mains if r["meta"]["fingerprint"] == mine[0]["meta"].get("main_fingerprint")]
+        if not ref:
+            return {**base, "action": "needs-you", "reasons": ["there's no eval of main to compare with"]}
+        ok, reasons = judge(mine[0], ref[0], base["case"])
+        if ok:
+            return {**base, "action": "judge-pass", "reasons": []}
+        if "rule-fix-try-2" in pr.get("labels", []):
+            return {**base, "action": "needs-you", "reasons": reasons}
+        return {**base, "action": "retry", "reasons": reasons, "result": ref[0]["artifact"]["id"]}
+    if not mains:
+        return {"action": "none", "why": "no full eval of main yet"}
+    if case:
+        if case not in mains[0]["cases"] or mains[0]["cases"][case]["kind"] == "clean":
+            return {"action": "none", "why": f"{case} isn't a visible bug case"}
+    else:
+        if len(mains) < 2 or mains[0]["meta"]["fingerprint"] != main_fp:
+            return {"action": "none", "why": "no two full evals of main as it is now"}
+        case = pick(mains[0], mains[1])
+        if not case:
+            return {"action": "none", "why": "no miss repeats"}
+    if f"{case}:{main_fp}" in attempts:
+        return {"action": "none", "why": f"{case} was already tried for main as it is now"}
+    return {"action": "try", "case": case, "result": mains[0]["artifact"]["id"]}
 
 
 # ---------- The AI's folder ----------
@@ -246,6 +316,13 @@ def main(argv: list[str] | None = None) -> None:
     g.add_argument("--after", type=Path, required=True)
     g.add_argument("--out", type=Path, required=True)
     sub.add_parser("sanitise")
+    t = sub.add_parser("state")
+    t.add_argument("--results", type=Path, required=True, help="folder of <artifact id>.json, each with 'artifact'")
+    t.add_argument("--prs", type=Path, required=True)
+    t.add_argument("--attempts", type=Path, required=True, help="one 'case:main_fp' per line")
+    t.add_argument("--main-fp", required=True)
+    t.add_argument("--now", required=True)
+    t.add_argument("--case", default="")
     a = p.parse_args(argv)
     load = lambda f: json.loads(f.read_text(encoding="utf-8"))  # noqa: E731
 
@@ -260,6 +337,11 @@ def main(argv: list[str] | None = None) -> None:
     elif a.cmd == "changes":
         a.out.mkdir(parents=True, exist_ok=True)
         print("\n".join(changes(a.before, a.after, a.out)))
+    elif a.cmd == "state":
+        rows = [load(f) for f in a.results.glob("*.json")]
+        rows.sort(key=lambda r: r["artifact"]["created_at"], reverse=True)
+        attempts = set(a.attempts.read_text(encoding="utf-8").split())
+        print(json.dumps(state(rows, load(a.prs), attempts, a.main_fp, a.now, a.case or None)))
     elif a.cmd == "sanitise":
         print(sanitise(sys.stdin.read()))
 

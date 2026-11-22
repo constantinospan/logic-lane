@@ -39,6 +39,7 @@ jobs:
       found: ${{ steps.pr.outputs.found }}
       number: ${{ steps.pr.outputs.number }}
       rounds: ${{ steps.pr.outputs.rounds }}
+      rule_fix: ${{ steps.pr.outputs.rule_fix }}
       sha: ${{ github.event.workflow_run.head_sha }}
       branch: ${{ github.event.workflow_run.head_branch }}
       play: ${{ steps.scope.outputs.play }}
@@ -62,10 +63,14 @@ jobs:
             exit 0
           fi
           prs=$(gh api "repos/${REPO}/commits/${SHA}/pulls" --jq '[.[] | select(.state == "open" and .base.ref == "main"
-            and .head.ref == $ENV.BRANCH and .head.repo.full_name == $ENV.REPO and .user.login == "constantinospan")]')
+            and .head.ref == $ENV.BRANCH and .head.repo.full_name == $ENV.REPO
+            and (.user.login == "constantinospan" or (.user.login == "claude[bot]"
+              and (.head.ref | startswith("rule-fix/")) and any(.labels[]; .name == "rule-fix"))))]')
+          # The owner's PRs, or a rule-fix PR (D27): opened by the rule-fix workflow as the Claude app, on a
+          # rule-fix/ branch, with the rule-fix label. Nothing else opens PRs as the app (D15).
           count=$(jq length <<<"$prs")
           if [ "$count" != 1 ]; then
-            echo "::notice::Found ${count} open PRs by the owner for this commit (need exactly 1). Not reviewed."
+            echo "::notice::Found ${count} open PRs by the owner (or rule-fix PRs) for this commit (need exactly 1). Not reviewed."
             exit 0
           fi
           if [ "$(jq -r '.[0].head.sha' <<<"$prs")" != "$SHA" ]; then
@@ -75,6 +80,7 @@ jobs:
           {
             echo "number=$(jq -r '.[0].number' <<<"$prs")"
             echo "rounds=$(jq '[.[0].labels[].name | select(. == "ai-fix-1" or . == "ai-fix-2")] | length' <<<"$prs")"
+            echo "rule_fix=$(jq '.[0].user.login == "claude[bot]"' <<<"$prs")"
             echo "found=true"
           } >> "$GITHUB_OUTPUT"
       - if: ${{ steps.pr.outputs.found == 'true' }}
@@ -414,6 +420,7 @@ jobs:
           SHOTS_BASE: ${{ steps.shots.outputs.base }}
           FIX_ROUNDS: ${{ needs.gate.outputs.rounds }}
           AI_FIX: ${{ vars.AI_FIX }}
+          RULE_FIX: ${{ needs.gate.outputs.rule_fix }}
         run: |
           set -o pipefail
           node tools/review/verdict.mjs "${RUNNER_TEMP}/verdict" | tee -a "$GITHUB_OUTPUT"
@@ -424,6 +431,7 @@ jobs:
           STATUS: ${{ steps.verdict.outputs.status }}
           FIX: ${{ steps.verdict.outputs.fix }}
           AI_FIX: ${{ vars.AI_FIX }}
+          RULE_FIX: ${{ needs.gate.outputs.rule_fix }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -432,8 +440,9 @@ jobs:
           case "$STATE" in pass) s=success ;; fail) s=failure ;; *) s=error ;; esac
           gh api "repos/${REPO}/statuses/${HEAD_SHA}" -f state="$s" -f context=ai-review \
             -f description="$STATUS" -f target_url="$RUN_URL" > /dev/null
-          # Over to the owner when the review didn't finish, or when it failed and no fix round will run.
-          if [ "$STATE" = incomplete ] || { [ "$STATE" = fail ] && [ "$AI_FIX" = on ] && [ "$FIX" != true ]; }; then
+          # Over to the owner when the review didn't finish, or when it failed and no fix round will run (a
+          # rule-fix PR never gets one).
+          if [ "$STATE" = incomplete ] || { [ "$STATE" = fail ] && { [ "$AI_FIX" = on ] || [ "$RULE_FIX" = true ]; } && [ "$FIX" != true ]; }; then
             gh pr edit "$PR" --repo "$REPO" --add-label needs-you
           fi
       - name: Say so if the verdict couldn't be built
@@ -458,7 +467,7 @@ jobs:
   # owner taps "Approve and run workflows", if GitHub holds it), and a green CI run starts this workflow again: round 2.
   fix:
     needs: [gate, verdict]
-    if: ${{ !cancelled() && needs.verdict.result == 'success' && needs.verdict.outputs.fix == 'true' && vars.AI_FIX == 'on' }}
+    if: ${{ !cancelled() && needs.verdict.result == 'success' && needs.verdict.outputs.fix == 'true' && vars.AI_FIX == 'on' && needs.gate.outputs.rule_fix != 'true' }}
     runs-on: ubuntu-24.04 # same machine and browsers as CI and the builder, so new pictures match
     timeout-minutes: 60
     concurrency: # never cancelled halfway through its push
