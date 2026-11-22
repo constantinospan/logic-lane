@@ -62,8 +62,8 @@ def models(record: dict) -> list[str]:
     for side steps)."""
     raw = record.get("raw") if isinstance(record.get("raw"), dict) else {}
     usage = raw.get("modelUsage") or {}
-    cost = lambda m: usage[m].get("costUSD", 0) if isinstance(usage[m], dict) else 0  # noqa: E731
-    return sorted(usage, key=lambda m: (-cost(m), m))
+    spent = lambda m: usage[m].get("costUSD", 0) if isinstance(usage[m], dict) else 0  # noqa: E731
+    return sorted(usage, key=lambda m: (-spent(m), m))
 
 
 # ---------- Scoring one run ----------
