@@ -140,6 +140,7 @@ jobs:
             state=$(gh api "repos/${REPO}/commits/${SHA}/statuses" --jq '[.[] | select(.context == "ai-review")][0].state // "none"' || echo none)
             if [ "$state" != none ] && [ "$state" != pending ]; then
               echo "AI review: $state"
+              # Only ❌ (failure) starts a fix round. "error" (an incomplete review) doesn't, so the eval runs then.
               if [ "$state" = failure ] && [ "$AI_FIX" = on ] && [ "${ROUNDS:-0}" -lt 2 ]; then
                 echo "skip=true" >> "$GITHUB_OUTPUT"
                 echo "A fix round is coming; its commit gets its own eval." >> "$GITHUB_STEP_SUMMARY"
@@ -365,7 +366,6 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      actions: write # only to delete this run's per-run files once scored
     outputs:
       errors: ${{ steps.score.outputs.errors }}
     steps:
@@ -412,17 +412,6 @@ jobs:
         run: |
           echo "::error::Some review runs errored or gave no result. See the report above."
           exit 1
-      # Per-run findings plus the slot map would tie findings to hidden cases, so they go as soon as they're scored.
-      - name: Delete the per-run files
-        if: ${{ always() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN: ${{ github.run_id }}
-        run: |
-          gh api --paginate "repos/${REPO}/actions/runs/${RUN}/artifacts" \
-            --jq '.artifacts[] | select(.name | test("^(run-[0-9]+|eval-plan|case-folders)$")) | .id' |
-            while read -r id; do gh api -X DELETE "repos/${REPO}/actions/artifacts/${id}"; done
 
   comment:
     needs: [plan, decide, report]
@@ -477,3 +466,23 @@ jobs:
           else
             gh api "repos/${REPO}/issues/${PR}/comments" -F body=@"$RUNNER_TEMP/body.md" > /dev/null
           fi
+
+  # Per-run findings plus the slot map would tie findings to hidden cases, so they go once scored. Its own job, so it
+  # also runs when the eval is skipped (nothing changed), fails or is cancelled.
+  cleanup:
+    needs: [plan, decide, review, report]
+    if: ${{ always() && needs.plan.result != 'skipped' }} # not on the CI runs the eval ignores
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write # only to delete this run's per-run files
+    steps:
+      - name: Delete the per-run files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.run_id }}
+        run: |
+          gh api --paginate "repos/${REPO}/actions/runs/${RUN}/artifacts" \
+            --jq '.artifacts[] | select(.name | test("^(run-[0-9]+|eval-plan|case-folders)$")) | .id' |
+            while read -r id; do gh api -X DELETE "repos/${REPO}/actions/artifacts/${id}"; done
