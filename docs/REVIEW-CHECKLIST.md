@@ -1,6 +1,7 @@
 # Review checklist
 
 The AI reviewer checks every PR against this list, and builders use it while working.
+(Throwaway line for the E2c eval proof. This PR is never merged.)
 
 ## How to review
 - **Two reviewers (D19).**
