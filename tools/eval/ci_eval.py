@@ -77,8 +77,9 @@ def fingerprint(rules: str, main: str, model: str, spec: str = "all/3") -> str:
     parts = [f"rules {p} {_object(rules, p)}" for p in ev.RULE_PATHS]
     parts += [f"trusted {p} {_object(main, p)}" for p in ev.TRUSTED_PATHS]
     parts += [f"eval {p} {_object(main, p)}" for p in EVAL_FILES]
-    parts += [f"code-review {c} " + hashlib.sha256(ev._job_block(ev.at_commit(c, ev.REVIEW_YML), "code-review")
-                                                  .encode()).hexdigest() for c in (rules, main)]  # prompt; tools
+    parts += [f"code-review {name} " + hashlib.sha256(ev._job_block(ev.at_commit(c, ev.REVIEW_YML), "code-review")
+                                                     .encode()).hexdigest()
+              for name, c in (("rules", rules), ("main", main))]  # prompt; tools. Never the commit ids themselves
     parts += [f"model {model}", f"spec {spec}"]
     return hashlib.sha256("\n".join(parts).encode()).hexdigest()[:20]
 

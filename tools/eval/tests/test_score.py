@@ -187,9 +187,21 @@ def test_report_totals():
     assert "Extra findings on bug cases: 0" in text
     assert "Errors: 1 of 7 runs" in text
     assert "Blocked tool calls: 1 in 1 runs" in text
-    assert "Cost: $3.50, turns: 84, time: 14 min" in text
+    assert "Cost: $3.50, turns: 84, time: 14.0 min" in text
 
 
 def test_report_with_no_bug_runs_says_zero_percent():
     text = score.report([score.score_run(rec(CLEAN, case="c01"))], META)
     assert "Bugs caught: 0 of 0 runs (0%)" in text
+
+
+def test_report_names_the_main_model_first_and_minutes_with_a_decimal():
+    usage = {"claude-haiku-5-5": {"costUSD": 0.001}, "claude-sonnet-5-5": {"costUSD": 0.2}}
+    r = {"case": "c04", "run": 1, "hidden": False, "expect": {"kind": "clean"}, "seconds": 42,
+         "review": {"summary": "s", "blocking": [], "suggestions": []},
+         "raw": {"modelUsage": usage, "total_cost_usd": 0.2, "num_turns": 3}}
+    s = score.score_run(r)
+    assert s["models"] == ["claude-sonnet-5-5", "claude-haiku-5-5"]
+    text = score.report([s], {"local_cli": "x", "action_cli": "y"})
+    assert "Model: claude-sonnet-5-5 (side steps: claude-haiku-5-5)" in text
+    assert "time: 0.7 min" in text
