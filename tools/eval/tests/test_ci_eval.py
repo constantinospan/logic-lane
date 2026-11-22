@@ -50,7 +50,8 @@ def test_fingerprint_depends_on_content_and_model():
     assert a != ci_eval.fingerprint(ev.base_commit(), HEAD, "claude-sonnet-5-5")  # BASE has older rules
     # Same content under another commit id: the same fingerprint (a squash merge matches main, and a push that
     # changes no rule file matches the PR's last eval). commit-tree makes that commit without moving any branch.
-    twin = ev.git("commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "twin", cwd=ev.REPO_ROOT).strip()
+    twin = ev.git("-c", "user.name=eval", "-c", "user.email=noreply@example.invalid", "commit-tree", "HEAD^{tree}",
+                  "-p", "HEAD", "-m", "twin", cwd=ev.REPO_ROOT).strip()
     assert ci_eval.fingerprint(twin, twin, "claude-sonnet-5-5") == a
     tree = ev.git("rev-parse", "HEAD^{tree}", cwd=ev.REPO_ROOT).strip()
     assert ci_eval._object(HEAD, "CLAUDE.md") == ev.git("rev-parse", f"{tree}:CLAUDE.md", cwd=ev.REPO_ROOT).strip()
