@@ -86,6 +86,26 @@ jobs:
             test-results/
           retention-days: 14
 
+  # The eval's Python tests (tools/eval, D23, D26). Not part of `test`, so it never holds up a deploy, but a red one
+  # stops the AI review, which needs a green CI. pytest comes from pip with exact versions and hashes
+  # (requirements-dev.txt, made from uv.lock), ready-built only, so nothing is built from source.
+  eval-tests:
+    if: ${{ !inputs.update_snapshots }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the cases' base commit
+          persist-credentials: false
+      - name: Python tests
+        working-directory: tools/eval
+        run: |
+          python3 --version
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet --require-hashes --no-deps --only-binary :all: -r requirements-dev.txt
+          "$RUNNER_TEMP/venv/bin/python" -m pytest -q
+
   # The required check on main. Passes only if every part above passed. It must never be skipped, because GitHub
   # counts a skipped required check as passed: `always()` keeps it running when a part fails, and on a manual snapshot
   # run (where the parts don't run) it goes red on purpose, so that run can't make a red PR look mergeable.

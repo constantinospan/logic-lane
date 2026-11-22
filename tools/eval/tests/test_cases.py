@@ -1,4 +1,5 @@
 """Checks every eval case is well formed and applies cleanly to BASE. Run: uv run pytest -v"""
+import re
 import subprocess
 
 import pytest
@@ -47,3 +48,12 @@ def test_patch_applies_to_base(case, base_repo):
     r = subprocess.run(["git", "apply", "--check", str(case["dir"] / "change.patch")], cwd=base_repo,
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("case", ev.load_cases(), ids=lambda c: c["id"])
+def test_case_never_touches_rule_files(case):
+    # pr/'s main carries the tested rule files, so a patch touching them wouldn't apply (and would test the rules).
+    patch = (case["dir"] / "change.patch").read_text()
+    touched = re.findall(r"(?m)^diff --git a/(\S+) ", patch)
+    for f in touched:
+        assert not any(f == p or f.startswith(p + "/") for p in ev.RULE_PATHS + ev.TRUSTED_PATHS), f
