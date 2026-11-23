@@ -266,3 +266,41 @@ def test_state_retry_learns_from_the_prs_eval_and_a_silent_try_2_goes_to_the_own
 
 def test_sanitise_drops_pictures_and_links():
     assert rf.sanitise("see ![x](https://evil/p.png) and [docs](https://evil)") == "see [picture removed] and docs"
+
+
+def test_untar_refuses_links_and_paths_outside(tmp_path):
+    import io
+    import tarfile
+
+    def tgz(add):
+        b = io.BytesIO()
+        with tarfile.open(fileobj=b, mode="w:gz") as t:
+            add(t)
+        b.seek(0)
+        return b
+
+    def file(t, name, data=b"x"):
+        i = tarfile.TarInfo(name)
+        i.size = len(data)
+        t.addfile(i, io.BytesIO(data))
+
+    rf._untar(tgz(lambda t: file(t, "./docs/a.md")), tmp_path / "ok")
+    assert (tmp_path / "ok/docs/a.md").read_bytes() == b"x"
+
+    def link(t):
+        i = tarfile.TarInfo("./docs/l.md")
+        i.type, i.linkname = tarfile.SYMTYPE, "/etc/passwd"
+        t.addfile(i)
+
+    for bad in (link, lambda t: file(t, "../out.md"), lambda t: file(t, "/abs.md")):
+        with pytest.raises(SystemExit, match="refused"):
+            rf._untar(tgz(bad), tmp_path / "bad")
+    assert not (tmp_path / "bad").exists() or not any((tmp_path / "bad").rglob("*"))
+
+
+def test_sanitise_escapes_raw_html():
+    assert rf.sanitise('<img src="https://evil/p.png"> <!-- hide -->') == '&lt;img src="https://evil/p.png"> &lt;!-- hide -->'
+
+
+def test_state_does_nothing_without_mains_fingerprint():
+    assert rf.state([], [], set(), "-", "2026-11-23T00:00:00Z", "b04")["action"] == "none"

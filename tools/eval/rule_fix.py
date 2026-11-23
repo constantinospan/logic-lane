@@ -131,6 +131,8 @@ def state(results: list[dict], prs: list[dict], attempts: set[str], main_fp: str
     rule-fix PRs {number, sha, ref, labels, head_date, judged (shas), stale}. attempts: "case:main_fp" markers.
 
     Actions: none, try (case, result), judge-pass / retry / needs-you (pr, reasons)."""
+    if not main_fp or main_fp == "-":
+        return {"action": "none", "why": "main's fingerprint is unknown (no eval result with a model yet)"}
     full = [r for r in results if _full(r)]
     # Results stand for content, not for how they ran: after a rules PR is squash-merged, main has the PR's
     # fingerprint and its daily eval is skipped, so the PR's own eval is main's. A fingerprint main had (now or as
@@ -197,9 +199,18 @@ def hidden_ids() -> list[str]:
 def _extract(ref: str, dest: Path, paths: list[str] | None = None) -> None:
     r = subprocess.run(["git", "archive", "--format=tar", ref, *(paths or [])], cwd=ev.REPO_ROOT,
                        capture_output=True, env=ev.GIT_ENV, check=True)
-    data = r.stdout
-    with tarfile.open(fileobj=io.BytesIO(data)) as tar:
-        # The "data" filter (no links out, no odd files) where Python has it (3.12 on GitHub).
+    _untar(io.BytesIO(r.stdout), dest)
+
+
+def _untar(fileobj, dest: Path) -> None:
+    """Unpack only plain files and folders with safe names, so a tar file the AI wrote can't put a link or a file
+    outside dest before `changes` looks at it. Anything else refuses the whole file."""
+    with tarfile.open(fileobj=fileobj) as tar:
+        for m in tar.getmembers():
+            parts = Path(m.name).parts
+            if not (m.isfile() or m.isdir()) or m.name.startswith("/") or ".." in parts:
+                raise SystemExit(f"refused: {m.name!r} in the tar file isn't a plain file or folder")
+        # The "data" filter as well where Python has it (3.12 on GitHub).
         tar.extractall(dest, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
 
 
@@ -301,6 +312,7 @@ def sanitise(text: str) -> str:
     """AI text for a PR body: no mentions, no issue-closing keywords, no secrets, short."""
     text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "[picture removed]", text)  # nothing loads from elsewhere
     text = re.sub(r"\[([^\]]*)\]\(([^)]*)\)", r"\1", text)  # links: just their text
+    text = text.replace("<", "&lt;")  # no raw HTML: no pictures from elsewhere, no hidden text
     text = text.replace("@", "@​")
     text = re.sub(r"(?i)\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\b(\s*:?\s*)#", r"\1\3#​", text)
     text = SECRETS.sub("[removed]", text)
@@ -330,6 +342,9 @@ def main(argv: list[str] | None = None) -> None:
     g.add_argument("--after", type=Path, required=True)
     g.add_argument("--out", type=Path, required=True)
     sub.add_parser("sanitise")
+    u = sub.add_parser("untar")
+    u.add_argument("--file", type=Path, required=True)
+    u.add_argument("--dest", type=Path, required=True)
     t = sub.add_parser("state")
     t.add_argument("--results", type=Path, required=True, help="folder of <artifact id>.json, each with 'artifact'")
     t.add_argument("--prs", type=Path, required=True)
@@ -356,6 +371,10 @@ def main(argv: list[str] | None = None) -> None:
         rows.sort(key=lambda r: r["artifact"]["created_at"], reverse=True)
         attempts = set(a.attempts.read_text(encoding="utf-8").split())
         print(json.dumps(state(rows, load(a.prs), attempts, a.main_fp, a.now, a.case or None)))
+    elif a.cmd == "untar":
+        a.dest.mkdir(parents=True, exist_ok=True)
+        with a.file.open("rb") as f:
+            _untar(f, a.dest)
     elif a.cmd == "sanitise":
         print(sanitise(sys.stdin.read()))
 

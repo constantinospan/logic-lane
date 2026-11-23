@@ -324,9 +324,10 @@ jobs:
       - name: Check what changed
         run: |
           set -euo pipefail
+          # Unpacked by a check that refuses links and odd files before anything is written (not plain tar).
           for x in before after; do
-            mkdir "$RUNNER_TEMP/$x/t"
-            tar -xzf "$RUNNER_TEMP/$x/"*.tgz -C "$RUNNER_TEMP/$x/t"
+            f=("$RUNNER_TEMP/$x/"*.tgz)
+            (cd tools/eval && python3 rule_fix.py untar --file "${f[0]}" --dest "$RUNNER_TEMP/$x/t")
           done
           (cd tools/eval && python3 rule_fix.py changes --before "$RUNNER_TEMP/before/t" --after "$RUNNER_TEMP/after/t" \
             --out "$RUNNER_TEMP/changes") | tee "$RUNNER_TEMP/changed.txt"
