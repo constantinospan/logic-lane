@@ -316,6 +316,10 @@ def test_changes_ignores_empty_placeholders_and_no_change_is_an_answer(tmp_path)
     out.mkdir()
     assert rf.changes(a, b, out) == []
     assert "changed nothing" in (out / "why.md").read_text()
+    # An empty file at an allowed path is a change like any other, never ignored.
+    a2, b2 = two(tmp_path / "e", BASE, {**BASE, "tools/review/prompts/code.md": ""})
+    (tmp_path / "out2").mkdir()
+    assert rf.changes(a2, b2, tmp_path / "out2") == ["tools/review/prompts/code.md"]
     assert sorted(x.name for x in out.rglob("*")) == ["why.md"]
 
 

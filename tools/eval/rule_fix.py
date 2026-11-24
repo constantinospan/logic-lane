@@ -269,7 +269,7 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
     """Copy the allowed changed files (plus why.md) to out/. Refuses anything else the AI touched, except new empty
     files (Claude Code's sandbox leaves empty placeholders such as .env and yarn.lock; they're never pushed).
     No change at all is an answer, not a refusal: the AI explains in why.md (e.g. the case isn't missed)."""
-    problems, changed = [], []
+    problems, changed, ignored = [], [], []
 
     def walk(root: Path) -> dict[str, Path]:
         return {str(p.relative_to(root)): p for p in root.rglob("*") if not p.is_dir() or p.is_symlink()}
@@ -282,6 +282,7 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
                 and pa.stat().st_mode == pb.stat().st_mode:
             continue
         if not pa and pb and not pb.is_symlink() and pb.is_file() and pb.stat().st_size == 0 and rel not in ALLOWED:
+            ignored.append(rel)
             continue
         if rel not in ALLOWED:
             problems.append(f"{rel}: not a file a rule fix may change")
@@ -300,6 +301,8 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
             problems.append(f"{rel}: looks like it contains a secret")
     if lines > MAX_CHANGED_LINES:
         problems.append(f"{lines} changed lines (at most {MAX_CHANGED_LINES})")
+    if ignored:  # on stderr, so the run log shows them but the list of changed files stays clean
+        print("ignored new empty files: " + ", ".join(ignored), file=sys.stderr)
     if problems:
         raise SystemExit("refused: " + "; ".join(problems))
     for rel in changed:
