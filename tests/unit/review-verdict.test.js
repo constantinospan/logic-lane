@@ -272,6 +272,15 @@ describe('fix loop (D17)', () => {
     );
     expect(nextStep('incomplete', input())).toContain('Re-run');
   });
+
+  it('never starts a fix round on a rule-fix PR (D27), and says so', () => {
+    expect(shouldFix('fail', input({ ruleFix: true }))).toBe(false);
+    expect(shouldFix('fail', input({ ruleFix: true, fixRounds: 0, fixOn: true }))).toBe(false);
+    expect(nextStep('fail', input({ ruleFix: true }))).toContain('rule-fix PR');
+    expect(nextStep('pass', input({ ruleFix: true, play: { needed: false, job: 'skipped', json: '' } }))).toBe(
+      "Next: merge if you're happy.",
+    );
+  });
 });
 
 describe('readInput', () => {

@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 import eval_review as ev
+import rule_fix
 import score
 
 # What decides an eval's result, besides the rules and the model. A PR touching the rules (except DECISIONS.md,
@@ -144,8 +145,9 @@ def record(saved: dict, case: dict, run: int) -> dict:
     return out
 
 
-def report(runs: Path, plan: dict, out: Path, meta: dict) -> tuple[str, int]:
-    """Score every planned run. A run with no saved result (the job crashed or timed out) is an error."""
+def report(runs: Path, plan: dict, out: Path, meta: dict, about: dict | None = None) -> tuple[str, int]:
+    """Score every planned run. A run with no saved result (the job crashed or timed out) is an error. Writes
+    report.md, plus results.json and details.json for rule fixes (E2d): `about` says which eval this was."""
     cases = {c["id"]: c for c in ev.load_cases()}
     records, versions = [], set()
     for slot, s in sorted(plan["slots"].items()):
@@ -158,6 +160,10 @@ def report(runs: Path, plan: dict, out: Path, meta: dict) -> tuple[str, int]:
     text = score.report(scored, {**meta, "local_cli": ", ".join(sorted(versions)) or "unknown"})
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.md").write_text(text, encoding="utf-8")
+    models = sorted({s["models"][0] for s in scored if s.get("models")})
+    res = rule_fix.results(scored, {**(about or {}), "model": ", ".join(models)})
+    (out / "results.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
+    (out / "details.json").write_text(json.dumps(rule_fix.details(records, scored), indent=1), encoding="utf-8")
     return text, sum(1 for s in scored if s["outcome"] == "error")
 
 
@@ -185,6 +191,7 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--slots", type=Path, required=True)
     s.add_argument("--out", type=Path, required=True)
     s.add_argument("--action", default="claude-code-action", help="what ran the reviews, for the report")
+    s.add_argument("--about", type=Path, help="JSON: which eval this was (mode, PR, commits, fingerprints)")
     a = p.parse_args(argv)
 
     if a.cmd == "slots":
@@ -197,7 +204,8 @@ def main(argv: list[str] | None = None) -> None:
         prepare(a.rules, a.main, json.loads(a.slots.read_text(encoding="utf-8")), a.out)
     elif a.cmd == "report":
         plan = json.loads(a.slots.read_text(encoding="utf-8"))
-        text, errors = report(a.runs, plan, a.out, {"action_cli": a.action})
+        about = json.loads(a.about.read_text(encoding="utf-8")) if a.about else {}
+        text, errors = report(a.runs, plan, a.out, {"action_cli": a.action}, about)
         print(text)
         if errors:
             print(f"{errors} run(s) errored", file=sys.stderr)

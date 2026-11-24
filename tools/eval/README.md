@@ -95,6 +95,16 @@ In `tools/eval` (add `--system-certs` after `uv run` on a work Mac):
 CI runs the tests here on every PR (`eval-tests`), installing pytest from `requirements-dev.txt`. After changing
 `uv.lock`, remake it with the command at the top of that file (a test fails until you do).
 
+## Rule fixes (D27)
+`.github/workflows/rule-fix.yml` runs after every eval (and daily). When the same visible case is missed in two
+full evals of main in a row, an AI drafts a change to the reviewer's checklist or prompt, in a copy of the repo
+without this folder. A script opens the PR (`rule-fix` label, @mention), the eval runs on it, and the workflow
+comments whether it looks better. You merge or close it. At most 2 tries per PR, then `needs-you`.
+- **By hand:** Actions → Rule fix → Run workflow, with a visible bug case (e.g. `b04`).
+- **Switch:** `AI_RULE_FIX` = `on`. Anything else is off.
+- The steps without AI are in `rule_fix.py` (tested in `tests/test_rule_fix.py`); the AI's instructions are
+  `tools/review/prompts/rule-fix.md`.
+
 ## What's in here
 - `cases/`: small changes on one base commit (`cases/BASE`), some with a planted bug, some clean. Each has the
   PR text, the patch, local check counts and what the reviewer should find (`case.json`). `cases-hidden/`: more

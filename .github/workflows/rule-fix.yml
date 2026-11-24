@@ -1,0 +1,435 @@
+# Rule fixes (plan item E2d, decision D27): when the eval on main keeps missing the same visible case, an AI drafts
+# a change to the code reviewer's instructions, a script (not the AI) opens the PR, and the eval re-runs on it.
+#
+#   decide (no AI)  works out what to do from the repo's state: open rule-fix PRs, saved eval results, markers
+#   tell   (no AI)  judge comments, needs-you, and the try-2 label (before any AI runs)
+#   copy   (no AI)  the AI's folder: the repo without tools/eval/, .github/ and git history (no hidden cases)
+#   fix    (AI)     edits only the reviewer's instructions in that copy; never sees this repo or GitHub
+#   push   (no AI)  checks what changed, pushes as the Claude app, opens the PR (try 1) or adds to it (try 2)
+#
+# Security (public repo): workflow_run and schedule always use main's copy of this file. The AI job has a read-only
+# job token, no shell, no web, and may only edit two files; everything it hands back is checked by `rule_fix.py
+# changes` before a job without AI pushes it. The owner always merges (D25).
+#
+# Switch (Settings → Secrets and variables → Actions → Variables): AI_RULE_FIX=on. Anything else means off.
+# By hand (Actions → Rule fix → Run workflow, with a case) works even when it's off.
+name: Rule fix
+
+on:
+  workflow_run:
+    workflows: [Eval]
+    types: [completed]
+  schedule:
+    - cron: '47 7 * * *' # catch-up, in case an Eval completion was missed
+  workflow_dispatch:
+    inputs:
+      case:
+        description: 'Visible bug case to try now, e.g. b04 (skips the "missed twice" check)'
+        required: true
+
+permissions: {} # every job asks for what it needs
+
+concurrency:
+  group: rule-fix # one at a time; never cancelled halfway (only the latest waiting run is kept, and every run
+  cancel-in-progress: false # works from the repo's state, so a replaced one loses nothing)
+
+jobs:
+  decide:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (vars.AI_RULE_FIX == 'on' && (github.event_name == 'schedule' || github.event.workflow_run.conclusion != 'skipped'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      issues: read
+    outputs:
+      action: ${{ steps.state.outputs.action }}
+      case: ${{ steps.state.outputs.case }}
+      pr: ${{ steps.state.outputs.pr }}
+      branch: ${{ steps.state.outputs.branch }}
+      sha: ${{ steps.state.outputs.sha }}
+      result: ${{ steps.state.outputs.result }}
+      said: ${{ steps.state.outputs.said }}
+      main: ${{ steps.state.outputs.main }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: What to do
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          IN_CASE: ${{ inputs.case }}
+        run: |
+          set -euo pipefail
+          if [ -n "$IN_CASE" ] && ! [[ "$IN_CASE" =~ ^[a-z][0-9]{2}$ ]]; then echo "::error::Bad case input."; exit 1; fi
+          d="$RUNNER_TEMP/state"; mkdir -p "$d/results"
+          # Saved eval results, newest first (only the newest 40 are read: older ones never decide anything).
+          gh api --paginate "repos/${REPO}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | {id, name, created_at}' > "$d/artifacts.jsonl"
+          jq -s -c 'map(select(.name | startswith("eval-result-"))) | sort_by(.created_at) | reverse | .[0:40][]' \
+            "$d/artifacts.jsonl" | while read -r a; do
+            id=$(jq -r .id <<<"$a")
+            gh api "repos/${REPO}/actions/artifacts/${id}/zip" > "$d/a.zip" || continue
+            if unzip -p "$d/a.zip" results.json > "$d/r.json" 2>/dev/null; then
+              jq --argjson a "$a" '. + {artifact: $a}' "$d/r.json" > "$d/results/${id}.json" || true
+            fi
+          done
+          # Attempt markers: rule-fix-attempt-<case>-<main fingerprint>.
+          jq -r 'select(.name | test("^rule-fix-attempt-[a-z][0-9]{2}-[0-9a-f]+$")) | .name
+            | sub("^rule-fix-attempt-"; "") | sub("-"; ":")' "$d/artifacts.jsonl" > "$d/attempts.txt"
+          # Open rule-fix PRs, with what the judge needs.
+          gh api "repos/${REPO}/pulls?state=open&base=main&per_page=100" --jq '[.[] | select(.user.login == "claude[bot]"
+            and (.head.ref | startswith("rule-fix/")) and any(.labels[]; .name == "rule-fix") and .head.repo.full_name == $ENV.REPO)
+            | {number, sha: .head.sha, ref: .head.ref, labels: [.labels[].name]}]' > "$d/open.json"
+          rules=$(cd tools/eval && python3 -c 'import eval_review as e; print(" ".join(e.RULE_PATHS))')
+          echo '[]' > "$d/prs.json"
+          jq -c '.[]' "$d/open.json" | while read -r row; do
+            n=$(jq -r .number <<<"$row"); sha=$(jq -r .sha <<<"$row")
+            git fetch -q origin "$sha" 2>/dev/null || git fetch -q origin "pull/${n}/head"
+            head_date=$(git show -s --format=%cI "$sha")
+            # Main's rules moved on since the branch was made: the PR's eval would test old rules plus the fix.
+            # shellcheck disable=SC2086
+            if git diff --quiet "$(git merge-base origin/main "$sha")" origin/main -- $rules; then stale=false; else stale=true; fi
+            judged=$(gh api "repos/${REPO}/issues/${n}/comments" --paginate --jq '[.[] | select(.user.login == "github-actions[bot]")
+              | .body | capture("<!-- logic-lane:rule-fix-judge sha=(?<s>[0-9a-f]{40}) -->") | .s]' | jq -s -c 'add // []')
+            jq --argjson r "$row" --arg d "$head_date" --argjson s "$stale" --argjson j "$judged" \
+              '. + [$r + {head_date: $d, stale: $s, judged: $j}]' "$d/prs.json" > "$d/p.json" && mv "$d/p.json" "$d/prs.json"
+          done
+          main=$(git rev-parse origin/main)
+          # Main's fingerprint now, with the model the newest eval used (a new model makes a new eval anyway).
+          model=$(jq -s -r 'sort_by(.artifact.created_at) | last | .meta.fp_model // empty' "$d"/results/*.json 2>/dev/null || true)
+          fp=-
+          if [[ "$model" =~ ^[][A-Za-z0-9._:-]+$ ]]; then
+            fp=$(cd tools/eval && python3 ci_eval.py fingerprint --rules "$main" --main "$main" --model "$model")
+          fi
+          (cd tools/eval && python3 rule_fix.py state --results "$d/results" --prs "$d/prs.json" --attempts "$d/attempts.txt" \
+            --main-fp "$fp" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --case "$IN_CASE") > "$RUNNER_TEMP/state.json"
+          jq . "$RUNNER_TEMP/state.json"
+          # The case goes into a branch name and artifact names: same pattern as the by-hand input, whatever chose it.
+          c=$(jq -r '.case // ""' "$RUNNER_TEMP/state.json")
+          if [ -n "$c" ] && ! [[ "$c" =~ ^[a-z][0-9]{2}$ ]]; then echo "::error::unexpected case id"; exit 1; fi
+          jq -r --arg m "$main" --arg fp "$fp" '"action=\(.action)", "case=\(.case // "")", "pr=\(.pr // "")",
+            "branch=\(.ref // "")", "sha=\(.sha // "")", "result=\(.result // "")", "said=\(.said // "")", "main=\($m)", "fp=\($fp)"' \
+            "$RUNNER_TEMP/state.json" >> "$GITHUB_OUTPUT"
+          echo "Rule fix: $(jq -r '.action + " " + (.case // "") + " " + (.why // "")' "$RUNNER_TEMP/state.json")" >> "$GITHUB_STEP_SUMMARY"
+          echo "$fp" > "$RUNNER_TEMP/fp"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ steps.state.outputs.action != 'none' }}
+        with:
+          name: rule-fix-state
+          path: ${{ runner.temp }}/state.json
+          retention-days: 1
+      # Recorded before any AI runs, so a try that fails or changes nothing never repeats for main as it is now. A
+      # PR the owner closed isn't reopened either.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ steps.state.outputs.action == 'try' }}
+        with:
+          name: rule-fix-attempt-${{ steps.state.outputs.case }}-${{ steps.state.outputs.fp }}
+          path: ${{ runner.temp }}/state.json
+          retention-days: 90
+
+  tell:
+    needs: decide
+    if: ${{ contains(fromJSON('["judge-pass","retry","needs-you"]'), needs.decide.outputs.action) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rule-fix-state
+          path: ${{ runner.temp }}
+      - name: Comment and label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ needs.decide.outputs.pr }}
+          SHA: ${{ needs.decide.outputs.sha }}
+          ACTION: ${{ needs.decide.outputs.action }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          reasons=$(jq -r '.reasons[]? | "- " + .' "$RUNNER_TEMP/state.json")
+          body="$RUNNER_TEMP/body.md"
+          {
+            echo "<!-- logic-lane:rule-fix-judge sha=${SHA} -->"
+            case "$ACTION" in
+              judge-pass) echo "## 🔁 Rule fix: looks better"
+                echo
+                echo "On the eval, the missed case is now caught every time, the other bug cases didn't get worse" \
+                  "(hidden ones included) and there are no new false alarms. 3 runs per case is a small sample, so" \
+                  "read the change before you merge it." ;;
+              retry) echo "## 🔁 Rule fix: try 1 didn't pass"
+                echo; echo "$reasons"; echo
+                echo "Try 2 of 2 is starting on this PR." ;;
+              needs-you) echo "## 🔁 Rule fix: over to you"
+                echo; echo "$reasons"; echo
+                echo "No more automatic tries. Change the files by hand, or close this PR. [The run]($RUN_URL)" ;;
+            esac
+          } > "$body"
+          gh pr comment "$PR" --repo "$REPO" --body-file "$body"
+          if [ "$ACTION" = retry ]; then
+            # Counted before the AI runs, so a try that pushes nothing still uses up the round.
+            gh label create rule-fix-try-2 --repo "$REPO" --color c5def5 --description 'Rule fix: second try used' 2>/dev/null || true
+            gh pr edit "$PR" --repo "$REPO" --add-label rule-fix-try-2
+          fi
+          if [ "$ACTION" = needs-you ]; then
+            gh label create needs-you --repo "$REPO" --color d93f0b --description 'Waiting for the owner' 2>/dev/null || true
+            gh pr edit "$PR" --repo "$REPO" --add-label needs-you
+          fi
+
+  copy:
+    needs: [decide, tell]
+    if: ${{ !cancelled() && (needs.decide.outputs.action == 'try' || (needs.decide.outputs.action == 'retry' && needs.tell.result == 'success')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.decide.outputs.main }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rule-fix-state
+          path: ${{ runner.temp }}
+      - name: The AI's folder
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ACTION: ${{ needs.decide.outputs.action }}
+          CASE: ${{ needs.decide.outputs.case }}
+          SHA: ${{ needs.decide.outputs.sha }}
+          MAIN: ${{ needs.decide.outputs.main }}
+          RESULT: ${{ needs.decide.outputs.result }}
+          SAID: ${{ needs.decide.outputs.said }}
+        run: |
+          set -euo pipefail
+          ref=$MAIN
+          if [ "$ACTION" = retry ]; then git fetch -q origin "$SHA"; ref=$SHA; fi
+          # Main's eval result: its visible numbers. What the reviewer said on the missed case comes from the same
+          # eval on try 1, and from the PR's own eval on try 2 (so it learns from what try 1's rules did).
+          gh api "repos/${REPO}/actions/artifacts/${RESULT}/zip" > "$RUNNER_TEMP/main.zip"
+          unzip -q -o "$RUNNER_TEMP/main.zip" results.json details.json -d "$RUNNER_TEMP/main"
+          details="$RUNNER_TEMP/main/details.json"
+          if [ -n "$SAID" ]; then
+            gh api "repos/${REPO}/actions/artifacts/${SAID}/zip" > "$RUNNER_TEMP/said.zip"
+            unzip -q -o "$RUNNER_TEMP/said.zip" details.json -d "$RUNNER_TEMP/said"
+            details="$RUNNER_TEMP/said/details.json"
+          fi
+          cd tools/eval
+          python3 rule_fix.py copy --ref "$ref" --main "$MAIN" --case "$CASE" --details "$details" \
+            --main-results "$RUNNER_TEMP/main/results.json" --failed "$(jq -r '.reasons[]?' "$RUNNER_TEMP/state.json")" \
+            --out "$RUNNER_TEMP/copy"
+          tar -czf "$RUNNER_TEMP/copy.tgz" -C "$RUNNER_TEMP/copy" .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rule-fix-copy
+          path: ${{ runner.temp }}/copy.tgz
+          retention-days: 1
+
+  fix:
+    needs: [decide, copy]
+    if: ${{ !cancelled() && needs.copy.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions: # like the code-review job's: read only
+      contents: read
+      pull-requests: read
+      issues: read
+      actions: read
+    env:
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rule-fix-copy
+          path: ${{ runner.temp }}/dl
+      # Never a checkout of this repo: only the copy, so the hidden cases are not on this machine.
+      - name: The folder
+        run: |
+          set -euo pipefail
+          tar -xzf "$RUNNER_TEMP/dl/copy.tgz" -C "$GITHUB_WORKSPACE"
+          rm -rf "$RUNNER_TEMP/dl"
+          git init -q .
+          git add -A
+          git -c user.name=rule-fix -c user.email=noreply@example.invalid commit -q -m copy
+      - name: Sandbox for Claude's commands
+        run: |
+          for i in 1 2 3; do
+            sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends bubblewrap socat && break
+            echo "apt-get attempt $i failed, retrying..."
+            sleep 5
+          done
+          command -v bwrap
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - id: claude
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }} # read-only: no app token, the AI can't write to GitHub
+          allowed_bots: claude
+          prompt: |
+            Read tools/review/prompts/rule-fix.md and follow it. The missed case is ${{ needs.decide.outputs.case }}; its details are in fix-input/.
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Edit(./docs/REVIEW-CHECKLIST.md),Edit(./tools/review/prompts/code.md),Edit(./fix-input/why.md)"
+            --disallowedTools "Bash,WebFetch,WebSearch,Task,Agent,Skill,SlashCommand,NotebookEdit,Read(//proc/**),Read(//sys/**),Read(//home/runner/work/_temp/**),Read(//home/runner/work/_actions/**),Read(//home/runner/.claude/**),Read(//home/runner/runners/**),Read(//home/runner/actions-runner/**)"
+      # Only the folder goes back, never .git. The push job checks every file against the copy.
+      - name: Hand back the folder
+        if: ${{ always() && steps.claude.outcome != 'skipped' }}
+        run: tar -czf "$RUNNER_TEMP/after.tgz" --exclude=./.git -C "$GITHUB_WORKSPACE" .
+      - if: ${{ always() && steps.claude.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rule-fix-after
+          path: ${{ runner.temp }}/after.tgz
+          retention-days: 1
+
+  push:
+    needs: [decide, fix]
+    if: ${{ !cancelled() && needs.fix.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      id-token: write # for the Claude app token, whose push and PR start CI (the job token's wouldn't, D15)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.decide.outputs.main }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rule-fix-copy
+          path: ${{ runner.temp }}/before
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rule-fix-after
+          path: ${{ runner.temp }}/after
+      - name: Check what changed
+        run: |
+          set -euo pipefail
+          # Unpacked by a check that refuses links and odd files before anything is written (not plain tar).
+          for x in before after; do
+            f=("$RUNNER_TEMP/$x/"*.tgz)
+            (cd tools/eval && python3 rule_fix.py untar --file "${f[0]}" --dest "$RUNNER_TEMP/$x/t")
+          done
+          (cd tools/eval && python3 rule_fix.py changes --before "$RUNNER_TEMP/before/t" --after "$RUNNER_TEMP/after/t" \
+            --out "$RUNNER_TEMP/changes") | tee "$RUNNER_TEMP/changed.txt"
+      - name: Push and open the PR
+        env:
+          REPO: ${{ github.repository }}
+          ACTION: ${{ needs.decide.outputs.action }}
+          CASE: ${{ needs.decide.outputs.case }}
+          PR: ${{ needs.decide.outputs.pr }}
+          SHA: ${{ needs.decide.outputs.sha }}
+          OLD_BRANCH: ${{ needs.decide.outputs.branch }}
+          MAIN: ${{ needs.decide.outputs.main }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ "$ACTION" = try ]; then
+            branch="rule-fix/${CASE}-${RUN_ID}"
+            git switch -q -c "$branch" "$MAIN" # the main the AI's copy came from, never a newer one
+          else
+            branch=$OLD_BRANCH
+            [[ "$branch" =~ ^rule-fix/[a-z][0-9]{2}-[0-9]+$ ]] || { echo "::error::Not a rule-fix branch."; exit 1; }
+            git fetch -q origin "$branch"
+            if [ "$(git rev-parse "origin/${branch}")" != "$SHA" ]; then
+              echo "::error::The branch moved on since it was judged. Nothing pushed."; exit 1
+            fi
+            git switch -q -c "$branch" "$SHA"
+          fi
+          while read -r f; do
+            [ -n "$f" ] && cp "$RUNNER_TEMP/changes/$f" "$f" && git add -- "$f"
+          done < "$RUNNER_TEMP/changed.txt"
+          git -c user.name='Logic Lane rule fix' -c user.email=noreply@example.invalid commit -q \
+            -m "Rule fix: the code reviewer should block what case ${CASE} plants (try $([ "$ACTION" = try ] && echo 1 || echo 2))" \
+            -m "Written by the rule-fix workflow (D27). Run: ${RUN_URL}"
+          # The Claude app token, the same way the pinned action gets it (src/github/token.ts): an OIDC token for
+          # the audience claude-code-github-action, exchanged at Anthropic. Masked at once, never printed, never an
+          # output, revoked when this step ends.
+          oidc=$(curl -sS --fail -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=claude-code-github-action" | jq -r '.value // empty')
+          echo "::add-mask::${oidc}"
+          tok=$(curl -sS --fail -X POST -H "Authorization: Bearer ${oidc}" -H "Content-Type: application/json" \
+            -d '{"permissions":{"contents":"write","pull_requests":"write","issues":"write"}}' \
+            https://api.anthropic.com/api/github/github-app-token-exchange | jq -r '.token // .app_token // empty')
+          unset oidc
+          [ -n "$tok" ] || { echo "::error::No Claude app token (see D27 for the fallback)."; exit 1; }
+          echo "::add-mask::${tok}"
+          revoke() {
+            curl -sS -o /dev/null -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${tok}" \
+              https://api.github.com/installation/token || true
+          }
+          trap revoke EXIT
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$tok" | base64 -w0)"
+          echo "::add-mask::${auth#AUTHORIZATION: basic }"
+          git -c http.extraheader="$auth" push -q "https://github.com/${REPO}.git" "HEAD:refs/heads/${branch}"
+          export GH_TOKEN=$tok
+          if [ "$ACTION" = try ]; then
+            for l in rule-fix rule-fix-try-1; do
+              gh label create "$l" --repo "$REPO" --color c5def5 --description 'Rule fix (D27)' 2>/dev/null || true
+            done
+            {
+              echo "**Rule fix (D27): nothing changes on the site.** The eval keeps missing case \`${CASE}\`: the code" \
+                "reviewer doesn't block what it plants. This PR changes the reviewer's instructions. The eval runs on it" \
+                "(hidden cases too) and comments, then this workflow says whether it looks better."
+              echo
+              echo "### Why (written by the rule-fix AI)"
+              cat "$RUNNER_TEMP/changes/why.md"
+              echo
+              echo "### Changed"
+              sed 's/^/- `/; s/$/`/' "$RUNNER_TEMP/changed.txt"
+              echo
+              echo "@constantinospan: you decide. Merge it, change it by hand, or close it. [The run](${RUN_URL})"
+            } > "$RUNNER_TEMP/body.md"
+            # No half results: a branch without its labelled PR would be invisible to the next runs.
+            if ! gh pr create --repo "$REPO" --base main --head "$branch" --title "Rule fix: the reviewer misses case ${CASE}" \
+                 --body-file "$RUNNER_TEMP/body.md" --label rule-fix --label rule-fix-try-1; then
+              git -c http.extraheader="$auth" push -q --delete "https://github.com/${REPO}.git" "$branch" || true
+              echo "::error::Couldn't open the PR, so the branch was deleted again."; exit 1
+            fi
+          else
+            { echo "Try 2 pushed. Why (written by the rule-fix AI):"; echo; cat "$RUNNER_TEMP/changes/why.md"; } > "$RUNNER_TEMP/body.md"
+            gh pr comment "$PR" --repo "$REPO" --body-file "$RUNNER_TEMP/body.md"
+          fi
+
+  # Branches of closed rule-fix PRs (this workflow made them).
+  tidy:
+    if: ${{ github.event_name == 'schedule' && vars.AI_RULE_FIX == 'on' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --paginate "repos/${REPO}/pulls?state=closed&per_page=100" --jq '.[] | select(.user.login == "claude[bot]"
+            and (.head.ref | test("^rule-fix/[a-z][0-9]{2}-[0-9]+$")) and .head.repo.full_name == env.REPO) | .head.ref' |
+            sort -u | while read -r b; do
+              gh api -X DELETE "repos/${REPO}/git/refs/heads/${b}" 2>/dev/null && echo "deleted ${b}" || true
+            done
