@@ -325,6 +325,7 @@ jobs:
           name: rule-fix-after
           path: ${{ runner.temp }}/after
       - name: Check what changed
+        id: check
         run: |
           set -euo pipefail
           # Unpacked by a check that refuses links and odd files before anything is written (not plain tar).
@@ -333,8 +334,16 @@ jobs:
             (cd tools/eval && python3 rule_fix.py untar --file "${f[0]}" --dest "$RUNNER_TEMP/$x/t")
           done
           (cd tools/eval && python3 rule_fix.py changes --before "$RUNNER_TEMP/before/t" --after "$RUNNER_TEMP/after/t" \
-            --out "$RUNNER_TEMP/changes") | tee "$RUNNER_TEMP/changed.txt"
+            --out "$RUNNER_TEMP/changes") | sed '/^$/d' | tee "$RUNNER_TEMP/changed.txt"
+          if [ -s "$RUNNER_TEMP/changed.txt" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            # The AI's answer is "no change": nothing is pushed. A silent try 2 goes to the owner on the next run.
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            { echo "### The rule-fix AI changed nothing"; echo; cat "$RUNNER_TEMP/changes/why.md"; } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Push and open the PR
+        if: ${{ steps.check.outputs.changed == 'true' }}
         env:
           REPO: ${{ github.repository }}
           ACTION: ${{ needs.decide.outputs.action }}

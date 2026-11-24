@@ -265,7 +265,9 @@ def copy(ref: str, main: str, case: str, details_rows: list[dict], main_res: dic
 # ---------- What the AI changed ----------
 
 def changes(before: Path, after: Path, out: Path) -> list[str]:
-    """Copy the allowed changed files (plus why.md) to out/. Refuses anything else the AI touched."""
+    """Copy the allowed changed files (plus why.md) to out/. Refuses anything else the AI touched, except new empty
+    files (Claude Code's sandbox leaves empty placeholders such as .env and yarn.lock; they're never pushed).
+    No change at all is an answer, not a refusal: the AI explains in why.md (e.g. the case isn't missed)."""
     problems, changed = [], []
 
     def walk(root: Path) -> dict[str, Path]:
@@ -277,6 +279,8 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
         pa, pb = a.get(rel), b.get(rel)
         if pa and pb and not pa.is_symlink() and not pb.is_symlink() and filecmp.cmp(pa, pb, shallow=False) \
                 and pa.stat().st_mode == pb.stat().st_mode:
+            continue
+        if not pa and pb and not pb.is_symlink() and pb.is_file() and pb.stat().st_size == 0 and rel not in ALLOWED:
             continue
         if rel not in ALLOWED:
             problems.append(f"{rel}: not a file a rule fix may change")
@@ -293,8 +297,6 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
         lines += abs(len(new) - len(old)) + sum(1 for x, y in zip(old, new) if x != y)
         if SECRETS.search(b[rel].read_text(encoding="utf-8")) and not SECRETS.search(a[rel].read_text(encoding="utf-8")):
             problems.append(f"{rel}: looks like it contains a secret")
-    if not changed:
-        problems.append("nothing changed")
     if lines > MAX_CHANGED_LINES:
         problems.append(f"{lines} changed lines (at most {MAX_CHANGED_LINES})")
     if problems:
