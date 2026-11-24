@@ -317,3 +317,27 @@ def test_changes_ignores_empty_placeholders_and_no_change_is_an_answer(tmp_path)
     assert rf.changes(a, b, out) == []
     assert "changed nothing" in (out / "why.md").read_text()
     assert sorted(x.name for x in out.rglob("*")) == ["why.md"]
+
+
+def test_a_practice_pr_never_gets_a_try_2():
+    pr = {"number": 7, "ref": "rule-fix/b01-5", "sha": "a" * 40, "labels": ["rule-fix", "rule-fix-try-1"],
+          "judged": [], "head_date": "2026-11-24T00:00:00Z", "stale": False}
+    def res(fp, main_fp, mode, caught, number=""):
+        cases = {"b01": {"kind": "bug", "runs": 3, "caught": caught, "missed": 3 - caught, "weak": 0,
+                         "false_alarms": 0, "errors": 0}}
+        return {"meta": {"mode": mode, "number": number, "rules": "a" * 40 if mode == "pr" else "m",
+                         "fingerprint": fp, "main_fingerprint": main_fp, "cases": "all", "runs": "3"},
+                "cases": cases, "hidden": {"runs": 9, "caught": 3, "missed": 6, "weak": 0, "false_alarms": 0,
+                                           "errors": 0},
+                "artifact": {"id": 1 if mode == "pr" else 2, "created_at": "2026-11-24T01:00:00Z"}}
+    rows = [res("p", "m", "pr", 1, 7), res("m", "m", "hand", 3)]
+    assert rf.state(rows, [pr], set(), "m", "2026-11-24T02:00:00Z")["action"] == "retry"
+    pr["labels"].append("rule-fix-practice")
+    assert rf.state(rows, [pr], set(), "m", "2026-11-24T02:00:00Z")["action"] == "needs-you"
+
+
+def test_copy_marks_a_practice_run(tmp_path):
+    main = ev.git("rev-parse", "HEAD", cwd=ev.REPO_ROOT).strip()
+    res = {"cases": {"b04": {"kind": "bug"}}}
+    rf.copy(main, main, "b04", [], res, tmp_path / "c", practice=True)
+    assert json.loads((tmp_path / "c/fix-input/task.json").read_text())["practice"] is True
