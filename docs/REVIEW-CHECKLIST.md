@@ -86,7 +86,10 @@ The AI reviewer checks every PR against this list, and builders use it while wor
 - [ ] No build step, framework or runtime dependency added.
 - [ ] `package.json` and the lockfile add or upgrade no package the request didn't ask for, and every added or
       upgraded package is named in the PR description.
-- [ ] Saving goes through the shared storage module.
+- [ ] Saving goes through the shared storage module (`js/core/storage.js`; games use `api.saveState`). Blocking: any
+      other way of keeping data (`localStorage`, `sessionStorage`, cookies, IndexedDB), even with a `logic-lane:` key
+      and even if wrapped in try/catch. Also Blocking: anything kept past the 3-hour resume window (scores, streaks,
+      bests, unlocks), because there's no long-term progress (D7).
 - [ ] New or changed logic has tests, and all checks pass.
 - [ ] Changed visual snapshot pictures (`tests/e2e/visual.spec.js-snapshots/`) match a visual change the request
       asked for, and the PR lists them with the reason. Unexplained picture changes are Blocking.
