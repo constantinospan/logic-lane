@@ -205,3 +205,8 @@ def test_report_names_the_main_model_first_and_minutes_with_a_decimal():
     text = score.report([s], {"local_cli": "x", "action_cli": "y"})
     assert "Model: claude-sonnet-5-5 (side steps: claude-haiku-5-5)" in text
     assert "time: 0.7 min" in text
+
+
+def test_models_cope_with_a_missing_or_empty_cost():
+    rec = {"raw": {"modelUsage": {"b": {"costUSD": None}, "a": {}, "c": {"costUSD": 0.5}, "d": "odd"}}}
+    assert score.models(rec) == ["c", "a", "b", "d"]
