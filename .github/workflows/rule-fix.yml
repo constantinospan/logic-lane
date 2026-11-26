@@ -26,6 +26,10 @@ on:
       case:
         description: 'Visible bug case to try now, e.g. b04 (skips the "missed twice" check)'
         required: true
+      practice:
+        description: 'Practice run: the case is caught already; ask for one small general improvement (proves the loop)'
+        type: boolean
+        default: false
 
 permissions: {} # every job asks for what it needs
 
@@ -54,6 +58,8 @@ jobs:
       result: ${{ steps.state.outputs.result }}
       said: ${{ steps.state.outputs.said }}
       main: ${{ steps.state.outputs.main }}
+      # Only for a by-hand new try. A practice PR gets the rule-fix-practice label and never a try 2.
+      practice: ${{ github.event_name == 'workflow_dispatch' && inputs.practice && steps.state.outputs.action == 'try' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -216,6 +222,7 @@ jobs:
           MAIN: ${{ needs.decide.outputs.main }}
           RESULT: ${{ needs.decide.outputs.result }}
           SAID: ${{ needs.decide.outputs.said }}
+          PRACTICE: ${{ needs.decide.outputs.practice }}
         run: |
           set -euo pipefail
           ref=$MAIN
@@ -231,9 +238,11 @@ jobs:
             details="$RUNNER_TEMP/said/details.json"
           fi
           cd tools/eval
+          extra=()
+          [ "$PRACTICE" = true ] && extra=(--practice)
           python3 rule_fix.py copy --ref "$ref" --main "$MAIN" --case "$CASE" --details "$details" \
             --main-results "$RUNNER_TEMP/main/results.json" --failed "$(jq -r '.reasons[]?' "$RUNNER_TEMP/state.json")" \
-            --out "$RUNNER_TEMP/copy"
+            --out "$RUNNER_TEMP/copy" "${extra[@]}"
           tar -czf "$RUNNER_TEMP/copy.tgz" -C "$RUNNER_TEMP/copy" .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -325,6 +334,7 @@ jobs:
           name: rule-fix-after
           path: ${{ runner.temp }}/after
       - name: Check what changed
+        id: check
         run: |
           set -euo pipefail
           # Unpacked by a check that refuses links and odd files before anything is written (not plain tar).
@@ -333,8 +343,16 @@ jobs:
             (cd tools/eval && python3 rule_fix.py untar --file "${f[0]}" --dest "$RUNNER_TEMP/$x/t")
           done
           (cd tools/eval && python3 rule_fix.py changes --before "$RUNNER_TEMP/before/t" --after "$RUNNER_TEMP/after/t" \
-            --out "$RUNNER_TEMP/changes") | tee "$RUNNER_TEMP/changed.txt"
+            --out "$RUNNER_TEMP/changes") | sed '/^$/d' | tee "$RUNNER_TEMP/changed.txt"
+          if [ -s "$RUNNER_TEMP/changed.txt" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            # The AI's answer is "no change": nothing is pushed. A silent try 2 goes to the owner on the next run.
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            { echo "### The rule-fix AI changed nothing"; echo; cat "$RUNNER_TEMP/changes/why.md"; } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Push and open the PR
+        if: ${{ steps.check.outputs.changed == 'true' }}
         env:
           REPO: ${{ github.repository }}
           ACTION: ${{ needs.decide.outputs.action }}
@@ -345,6 +363,7 @@ jobs:
           MAIN: ${{ needs.decide.outputs.main }}
           RUN_ID: ${{ github.run_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PRACTICE: ${{ needs.decide.outputs.practice }}
         run: |
           set -euo pipefail
           set +x
@@ -388,13 +407,25 @@ jobs:
           git -c http.extraheader="$auth" push -q "https://github.com/${REPO}.git" "HEAD:refs/heads/${branch}"
           export GH_TOKEN=$tok
           if [ "$ACTION" = try ]; then
-            for l in rule-fix rule-fix-try-1; do
+            labels=(rule-fix rule-fix-try-1)
+            title="Rule fix: the reviewer misses case ${CASE}"
+            [ "$PRACTICE" = true ] && labels+=(rule-fix-practice) && title="Rule fix practice: case ${CASE} (caught already)"
+            largs=()
+            for l in "${labels[@]}"; do
+              largs+=(--label "$l")
               gh label create "$l" --repo "$REPO" --color c5def5 --description 'Rule fix (D27)' 2>/dev/null || true
             done
             {
-              echo "**Rule fix (D27): nothing changes on the site.** The eval keeps missing case \`${CASE}\`: the code" \
-                "reviewer doesn't block what it plants. This PR changes the reviewer's instructions. The eval runs on it" \
-                "(hidden cases too) and comments, then this workflow says whether it looks better."
+              if [ "$PRACTICE" = true ]; then
+                echo "**Rule fix practice (D27): nothing changes on the site.** Started by hand to prove the loop: the" \
+                  "reviewer already catches case \`${CASE}\`, so the AI was asked for one small general improvement." \
+                  "The eval runs on it (hidden cases too) and comments, then this workflow says whether it looks better." \
+                  "No second try. Close it unless you want the change."
+              else
+                echo "**Rule fix (D27): nothing changes on the site.** The eval keeps missing case \`${CASE}\`: the code" \
+                  "reviewer doesn't block what it plants. This PR changes the reviewer's instructions. The eval runs on it" \
+                  "(hidden cases too) and comments, then this workflow says whether it looks better."
+              fi
               echo
               echo "### Why (written by the rule-fix AI)"
               cat "$RUNNER_TEMP/changes/why.md"
@@ -405,8 +436,8 @@ jobs:
               echo "@constantinospan: you decide. Merge it, change it by hand, or close it. [The run](${RUN_URL})"
             } > "$RUNNER_TEMP/body.md"
             # No half results: a branch without its labelled PR would be invisible to the next runs.
-            if ! gh pr create --repo "$REPO" --base main --head "$branch" --title "Rule fix: the reviewer misses case ${CASE}" \
-                 --body-file "$RUNNER_TEMP/body.md" --label rule-fix --label rule-fix-try-1; then
+            if ! gh pr create --repo "$REPO" --base main --head "$branch" --title "$title" \
+                 --body-file "$RUNNER_TEMP/body.md" "${largs[@]}"; then
               git -c http.extraheader="$auth" push -q --delete "https://github.com/${REPO}.git" "$branch" || true
               echo "::error::Couldn't open the PR, so the branch was deleted again."; exit 1
             fi

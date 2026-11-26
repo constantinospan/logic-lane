@@ -36,6 +36,13 @@ fails.
 5. Rules must agree with `docs/DECISIONS.md`. If the only fix would change a decision, change nothing and say so
    in `why.md`.
 
+## Practice runs
+If `task.json` has `"practice": true`, the owner started this run by hand to prove the whole loop, and the reviewer
+already catches this case. Then make **one** small, general improvement that a careful reviewer would agree with:
+make a vague checklist item clearer, or add a short example of what counts as Blocking for this kind of problem. All
+the rules above still apply: nothing from this test PR, nothing weakened, no new false alarms. Start `why.md` with
+"Practice run:". If you find nothing worth improving, change nothing and say so.
+
 ## `fix-input/why.md`
 A few short lines in plain English for the owner (a busy parent): what the reviewer missed, why, and what you
 changed. No @-mentions. This text goes into the PR description.

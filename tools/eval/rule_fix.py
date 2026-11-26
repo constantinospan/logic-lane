@@ -169,7 +169,7 @@ def state(results: list[dict], prs: list[dict], attempts: set[str], main_fp: str
         ok, reasons = judge(mine[0], ref[0], base["case"])
         if ok:
             return {**base, "action": "judge-pass", "reasons": []}
-        if "rule-fix-try-2" in pr.get("labels", []):
+        if {"rule-fix-try-2", "rule-fix-practice"} & set(pr.get("labels", [])):  # a practice run has one try
             return {**base, "action": "needs-you", "reasons": reasons}
         # Main's numbers to compare with; what the reviewer said comes from the PR's own eval (try 1's rules).
         return {**base, "action": "retry", "reasons": reasons, "result": ref[0]["artifact"]["id"],
@@ -228,7 +228,7 @@ def leaks(folder: Path, ids: list[str]) -> list[str]:
 
 
 def copy(ref: str, main: str, case: str, details_rows: list[dict], main_res: dict, out: Path,
-         failed: list[str] | None = None) -> None:
+         failed: list[str] | None = None, practice: bool = False) -> None:
     """out/: the repo at `ref` without LEFT_OUT and without history, rule settings from main, plus fix-input/."""
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
@@ -256,6 +256,7 @@ def copy(ref: str, main: str, case: str, details_rows: list[dict], main_res: dic
         "runs": [d for d in details_rows if d["case"] == case],
         "main": {cid: c for cid, c in main_res["cases"].items()},  # visible numbers only
         "last_try_failed_because": failed or [],
+        "practice": practice,
     }, indent=2), encoding="utf-8")
     bad = leaks(out, hidden_ids())
     if bad:
@@ -265,8 +266,10 @@ def copy(ref: str, main: str, case: str, details_rows: list[dict], main_res: dic
 # ---------- What the AI changed ----------
 
 def changes(before: Path, after: Path, out: Path) -> list[str]:
-    """Copy the allowed changed files (plus why.md) to out/. Refuses anything else the AI touched."""
-    problems, changed = [], []
+    """Copy the allowed changed files (plus why.md) to out/. Refuses anything else the AI touched, except new empty
+    files (Claude Code's sandbox leaves empty placeholders such as .env and yarn.lock; they're never pushed).
+    No change at all is an answer, not a refusal: the AI explains in why.md (e.g. the case isn't missed)."""
+    problems, changed, ignored = [], [], []
 
     def walk(root: Path) -> dict[str, Path]:
         return {str(p.relative_to(root)): p for p in root.rglob("*") if not p.is_dir() or p.is_symlink()}
@@ -277,6 +280,9 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
         pa, pb = a.get(rel), b.get(rel)
         if pa and pb and not pa.is_symlink() and not pb.is_symlink() and filecmp.cmp(pa, pb, shallow=False) \
                 and pa.stat().st_mode == pb.stat().st_mode:
+            continue
+        if not pa and pb and not pb.is_symlink() and pb.is_file() and pb.stat().st_size == 0 and rel not in ALLOWED:
+            ignored.append(rel)
             continue
         if rel not in ALLOWED:
             problems.append(f"{rel}: not a file a rule fix may change")
@@ -293,10 +299,10 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
         lines += abs(len(new) - len(old)) + sum(1 for x, y in zip(old, new) if x != y)
         if SECRETS.search(b[rel].read_text(encoding="utf-8")) and not SECRETS.search(a[rel].read_text(encoding="utf-8")):
             problems.append(f"{rel}: looks like it contains a secret")
-    if not changed:
-        problems.append("nothing changed")
     if lines > MAX_CHANGED_LINES:
         problems.append(f"{lines} changed lines (at most {MAX_CHANGED_LINES})")
+    if ignored:  # on stderr, so the run log shows them but the list of changed files stays clean
+        print("ignored new empty files: " + ", ".join(ignored), file=sys.stderr)
     if problems:
         raise SystemExit("refused: " + "; ".join(problems))
     for rel in changed:
@@ -337,6 +343,7 @@ def main(argv: list[str] | None = None) -> None:
     c.add_argument("--main-results", type=Path, required=True)
     c.add_argument("--failed", default="", help="why the last try failed, one reason per line")
     c.add_argument("--out", type=Path, required=True)
+    c.add_argument("--practice", action="store_true", help="by hand: the case is caught; one small general improvement")
     g = sub.add_parser("changes")
     g.add_argument("--before", type=Path, required=True)
     g.add_argument("--after", type=Path, required=True)
@@ -362,7 +369,7 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps({"pass": ok, "reasons": reasons}))
     elif a.cmd == "copy":
         copy(a.ref, a.main, a.case, load(a.details), load(a.main_results), a.out,
-             [r for r in a.failed.splitlines() if r.strip()])
+             [r for r in a.failed.splitlines() if r.strip()], a.practice)
     elif a.cmd == "changes":
         a.out.mkdir(parents=True, exist_ok=True)
         print("\n".join(changes(a.before, a.after, a.out)))

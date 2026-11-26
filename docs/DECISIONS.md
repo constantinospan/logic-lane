@@ -448,8 +448,14 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   gives hidden numbers.
 - **What it may change:** only `docs/REVIEW-CHECKLIST.md` and `tools/review/prompts/code.md`. A job without AI
   checks every file it hands back (only those two, plain files, no secrets, at most 200 changed lines) before
-  anything is pushed. `CLAUDE.md`, settings, its own instructions (`tools/review/prompts/rule-fix.md`) always
-  come from main.
+  anything is pushed. New empty files are ignored and never pushed (Claude Code's sandbox leaves placeholders
+  such as `.env`; first proof run, 2026-11-24). If the AI changes nothing, that's its answer: nothing is pushed,
+  and its reason goes into the run's summary.
+- **Practice runs (owner's choice, 2026-11-24):** a by-hand run can be marked practice, for a case main already
+  catches. The AI is asked for one small general improvement, so the whole loop (app token, PR, review, eval,
+  judge) can be proven while no visible case is missed. Its PR gets the `rule-fix-practice` label and never a
+  try 2: if it doesn't look better, it goes to the owner. `CLAUDE.md`, settings, its own instructions
+  (`tools/review/prompts/rule-fix.md`) always come from main.
 - **Who writes to GitHub:** never the AI. A job without AI pushes a `rule-fix/<case>-<run>` branch and opens the
   PR as the Claude app (so CI and the review start, D15), with the `rule-fix` label and an @mention of the owner.
   It gets the app token the same way the pinned action does (an OIDC token exchanged at Anthropic), masked and
