@@ -8,8 +8,26 @@ npm run check                                 # type check + unit tests + browse
 ```
 `npm run check` is what agents run before pushing. CI (`.github/workflows/ci.yml`) runs the same checks on every PR
 and on `main` before deploying, split across machines working at the same time: type check and unit tests on one,
-browser tests shared out over three (`--shard=1/3` etc.). Its `test` job passes only if all of
-them passed, and must pass before a PR can merge. When something fails, the run page has a `test-report-<n>`
+browser tests shared out over several (`--shard=1/7` etc.). Its `test` job passes only if all of
+them passed, and must pass before a PR can merge.
+
+**What a run tests (D20).** A first job, `scope` (`tools/ci/scope.mjs`), decides from the PR's changed files:
+- `main`, manual runs, or anything shared: **everything**.
+- Only Markdown files: **docs**, type check and unit tests only (no browser tests).
+- Only one game's files (`games/<id>/`, `tests/unit/games/<id>.test.js`, `tests/e2e/<id>.spec.js`, its `<id>-*`
+  pictures, plus any Markdown): **game**, everything except the *other* games' browser tests. Unit tests always all run.
+
+It counts the browser tests that will run and starts about one machine per 50, never fewer than 3. The run page's
+summary and each browser job's log say the scope (`Test scope: game, shard 2 of 5, left out: …`). When a PR
+says which checks passed, it must match that scope. A PR scoped to one game can still pass while `main` has moved on;
+`main` always runs everything before deploying, so a miss there blocks the deploy and the live site keeps the last
+good version.
+
+**Game tests are tagged.** Every browser test that opens a game (other than the demo) has the tag
+`@game:<id>`: a whole `tests/e2e/<id>.spec.js` sits in one `test.describe('…', { tag: '@game:<id>' }, …)`, and a
+game's tests in shared files (`a11y.spec.js`, `visual.spec.js`) get `{ tag: '@game:<id>' }`. The fixtures check it
+while the tests run: a test that opens `#/game/<id>` or `#/play/<id>` without the tag fails. A unit test
+(`tests/unit/game-imports.test.js`) checks that a game and its own tests never import another game's files. When something fails, the run page has a `test-report-<n>`
 download with the Playwright report and the pictures of what went wrong.
 
 Individual parts:
@@ -64,7 +82,8 @@ and the `@claude` builder do. On a Mac or in claude.ai/code they skip.
    a solver) and within that level's rules. `tests/unit/games/demo.test.js` is a small example.
 2. The shared game tests pick up the new game automatically once it's in `GAMES` (`js/core/games.js`).
 3. Add a browser test for the game's interactions (e.g. drag, multi-step moves, hints). Add its screens to
-   `tests/e2e/a11y.spec.js` and `tests/e2e/visual.spec.js`.
+   `tests/e2e/a11y.spec.js` and `tests/e2e/visual.spec.js`. Tag every one of them `@game:<id>` (see "What a run
+   tests" above); the fixtures fail an untagged game test.
 
 ## Notes
 - `tests/shipped-files.js` is the one definition of what the site ships. The PRECACHE test, the deploy version

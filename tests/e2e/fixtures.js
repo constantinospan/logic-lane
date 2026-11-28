@@ -1,12 +1,17 @@
 // Shared browser-test setup. Every test automatically fails on:
 // - any console error or uncaught page error
 // - any request outside /logic-lane/ (including requests made by the service worker) (CLAUDE.md: no network)
+// - a test that opens a game (other than the demo) without that game's tag, @game:<id> (D20: CI leaves out other
+//   games' tests by tag, so an untagged game test would quietly run, or be left out, at the wrong time)
 // It also replaces speech with a stub that records what would have been spoken.
 
+import fs from 'node:fs';
 import { test as base, expect } from '@playwright/test';
 import { precacheList } from '../shipped-files.js';
 
 const PRECACHED = new Set(precacheList());
+const GAMES = fs.readdirSync(new URL('../../games/', import.meta.url), { withFileTypes: true })
+  .filter((d) => d.isDirectory() && d.name !== 'demo').map((d) => d.name);
 
 export const test = base.extend({
   context: async ({ context }, use) => {
@@ -34,9 +39,15 @@ export const test = base.extend({
     await use(context);
   },
 
-  page: async ({ page, context, baseURL }, use) => {
+  page: async ({ page, context, baseURL }, use, testInfo) => {
     /** @type {string[]} */
     const problems = [];
+    /** Games this test opened (#/game/<id> or #/play/<id>), checked against its tags at the end. */
+    const opened = new Set();
+    page.on('framenavigated', (frame) => {
+      const id = frame.url().match(/#\/(?:game|play)\/([^/?#]+)/)?.[1];
+      if (id && GAMES.includes(id)) opened.add(id);
+    });
     page.on('console', (msg) => {
       if (msg.type() === 'error') problems.push(`console error: ${msg.text()}`);
     });
@@ -54,6 +65,13 @@ export const test = base.extend({
     });
     await use(page);
     expect(problems, 'no console errors, page errors or outside requests').toEqual([]);
+    const untagged = [...opened].filter((id) => !testInfo.tags.includes(`@game:${id}`));
+    expect(untagged, 'a test that opens a game is tagged @game:<id> (docs/TESTING.md)').toEqual([]);
+    // And never tagged for a game it doesn't open: it would be left out when only the game it does test changes.
+    // (A test that skipped itself, e.g. a phone-only test on the tablet, opened nothing on purpose.)
+    const extra = testInfo.expectedStatus === 'skipped' ? [] :
+      testInfo.tags.filter((t) => t.startsWith('@game:') && !opened.has(t.slice('@game:'.length)));
+    expect(extra, 'a test is tagged only for the games it opens').toEqual([]);
   },
 });
 

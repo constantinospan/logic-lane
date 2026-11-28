@@ -24,8 +24,41 @@ concurrency:
 
 jobs:
   # The same checks as `npm run check`, split across machines that run at the same time: type check and unit tests on
-  # one, browser tests shared out over three ("shards": Playwright gives each a third of all tests, so new tests and
-  # new screen sizes are included automatically).
+  # one, browser tests shared out over several ("shards": Playwright gives each an equal part, so new tests and new
+  # screen sizes are included automatically).
+  #
+  # What a run tests (D20, plan step 10), decided by tools/ci/scope.mjs (fixed rules, unit-tested):
+  # - main, manual runs, anything unsure: everything;
+  # - a PR that changes only Markdown: type check and unit tests only;
+  # - a PR that changes only one game: everything except the OTHER games' browser tests (tagged @game:<id>).
+  # It also counts the browser tests and starts about one machine per 50 (never fewer than 3).
+  scope:
+    if: ${{ !inputs.update_snapshots }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.scope.outputs.mode }}
+      grep: ${{ steps.scope.outputs.grep }}
+      shard_total: ${{ steps.scope.outputs.shard_total }}
+      shards: ${{ steps.scope.outputs.shards }}
+    env:
+      CI: 'true'
+      VISUAL: '1' # so the visual tests are counted (visual.spec.js refuses to load on GitHub without it)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2 # on a PR this is the merge commit and its parent on main: exactly what would merge
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+        run: node tools/ci/scope.mjs --event "$EVENT"
+
   checks:
     if: ${{ !inputs.update_snapshots }}
     runs-on: ubuntu-24.04
@@ -43,17 +76,22 @@ jobs:
       - run: npm test
 
   browser:
-    if: ${{ !inputs.update_snapshots }}
+    needs: scope
+    if: ${{ !inputs.update_snapshots && needs.scope.outputs.mode != 'docs' }}
     # Pinned (not ubuntu-latest): visual snapshots depend on the machine's fonts. Keep in step with claude.yml.
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false # finish every shard, so one red run shows all failures
       matrix:
-        shard: [1, 2, 3]
+        shard: ${{ fromJSON(needs.scope.outputs.shards) }}
     env:
       CI: 'true'
       VISUAL: '1'
+      MODE: ${{ needs.scope.outputs.mode }}
+      GREP: ${{ needs.scope.outputs.grep }}
+      TOTAL: ${{ needs.scope.outputs.shard_total }}
+      SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -75,7 +113,14 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
       - if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
         run: npx playwright install-deps chromium webkit
-      - run: npx playwright test --shard=${{ matrix.shard }}/3
+      - name: Browser tests
+        run: |
+          echo "Test scope: ${MODE}, shard ${SHARD} of ${TOTAL}${GREP:+, left out: ${GREP}}"
+          if [ -n "$GREP" ]; then
+            npx playwright test --shard="${SHARD}/${TOTAL}" --grep-invert "$GREP"
+          else
+            npx playwright test --shard="${SHARD}/${TOTAL}"
+          fi
       - name: Upload test report and pictures (on failure)
         if: ${{ failure() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -109,19 +154,24 @@ jobs:
   # The required check on main. Passes only if every part above passed. It must never be skipped, because GitHub
   # counts a skipped required check as passed: `always()` keeps it running when a part fails, and on a manual snapshot
   # run (where the parts don't run) it goes red on purpose, so that run can't make a red PR look mergeable.
+  # Browser tests may be skipped only when the scope job itself succeeded and said "docs".
   test:
     if: ${{ always() }}
-    needs: [checks, browser]
+    needs: [scope, checks, browser]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: All checks passed?
         env:
+          SCOPE: ${{ needs.scope.result }}
+          MODE: ${{ needs.scope.outputs.mode }}
           CHECKS: ${{ needs.checks.result }}
           BROWSER: ${{ needs.browser.result }}
         run: |
-          echo "type check + unit tests: ${CHECKS}; browser tests: ${BROWSER}"
-          test "${CHECKS}" = success && test "${BROWSER}" = success
+          echo "scope: ${SCOPE} (${MODE:-none}); type check + unit tests: ${CHECKS}; browser tests: ${BROWSER}"
+          test "${SCOPE}" = success
+          test "${CHECKS}" = success
+          if [ "${MODE}" = docs ]; then test "${BROWSER}" = skipped; else test "${BROWSER}" = success; fi
 
   # Run by hand (Actions → CI → Run workflow → update_snapshots) to make new visual snapshot pictures on the same
   # machine CI uses. It never commits: download the "snapshots" artifact, look at every picture, then commit.

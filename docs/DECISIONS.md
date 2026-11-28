@@ -265,8 +265,25 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
    that games never import another game's files, so one game's change can't break another.
 3. **Machines grow with the tests.** CI counts the browser tests and starts about one shard per 50 (public repos:
    free minutes, up to 20 machines at once).
-- **When:** rules 2 and 3 are built when `main`'s CI takes more than 2m30s, or at the third game, whichever comes
-  first (PLAN step 10). Rule 1 is part of every game.
+- **When:** rules 2 and 3 were due when `main`'s CI passed 2m30s, or at the third game (PLAN step 10). Rule 1 is
+  part of every game.
+- **Built (step 10, 2026-11-28, owner chose D20 as written over a simpler first step):**
+  - A first CI job, `scope` (`tools/ci/scope.mjs`, plain rules, unit-tested), reads the PR's merge commit against its
+    parent on `main` (renames count as delete + add, so a file moved out of a game counts for both). Only Markdown →
+    type check and unit tests. Only one game's files → everything except other games' browser tests. Anything else,
+    `main`, manual runs → everything. Unit tests always all run (they take seconds).
+  - "Other games' tests" are found by Playwright tags (`@game:<id>`), not by names: names differ between files. The
+    shared test fixtures fail any test that opens a game without its tag, so a game's test can't slip past the filter.
+  - Machines: the scope job counts the selected browser tests (`playwright test --list`, under 2 s) and starts
+    `max(3, ceil(count / 50))`, never more than the tests. 315 tests today → 7 machines.
+  - The required `test` check needs the scope job to succeed. Browser tests may be skipped only when it said
+    "docs". A crash in the scope job turns `test` red, never quietly green.
+  - **Known gap:** every game's `game.js` is loaded when the app starts (`js/core/games.js`). A game's top-level code
+    (a page-wide listener, a style, a storage write) could affect another game without importing it, and a PR that
+    changes only that game wouldn't run the other game's tests. The full run on `main` catches it and blocks the
+    deploy, so the live site keeps the last good version. The import test makes the common case safe, not every case.
+  - Measured before (5 runs on `main`, 2026-11-21 to 28): the slowest browser machine took 130–147 s, of which
+    25–52 s installs the browsers' system libraries on every machine. That setup cost wasn't changed here.
 
 ### D21. Idea gate: every request is reviewed before any code (agreed 2026-11-14, built in plan step 6c)
 - **Every request, big or small**, goes to an idea reviewer before any code is written. Skipped: "revert PR #N"
