@@ -15,8 +15,40 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 6b ✅ | AI reviewers | Play reviewer (browser, screenshots) and code reviewer (diff), one verdict, auto-fix loop (max 2) (D19). Added on top of the working loop; expect a few iterations | Claude | 10 min | 1.5–2 h |
 | 6c ✅ | Idea gate (D21) | Every request is reviewed by an idea reviewer before any code is written, on GitHub and in sessions. Clear requests are built as usual (with a short brief); unclear ones get questions first. Fixed rules in a tested script, settings in a repo file | Claude | 10 min | 1.5–2 h |
 | 8 ✅ | Arrow path v1 | Puzzle generator + solver, ~30-level ladder, Easy/Medium/Hard starts, loops later in the ladder | Claude | — | 3–5 h |
-| 9 | Playtest | Install on the tablet, play with her, turn feedback into issues | Me | 20 min + play | — |
+| 9 | Playtest | Install on the Android phone and play on the desktop (no tablet or iPhone), play with her, turn feedback into issues | Me | 20 min + play | — |
 | 10 | Test scaling (D20) | **When `main`'s CI passes 2m30s or at the third game:** PRs run only what they could break, shards grow with the tests, a no-cross-game-imports test | Claude | — | 1–2 h |
+
+## Game ideas (owner, 2026-11-28)
+
+By priority. Each game gets its own idea check (D21) when it's built. Order of the first ones: D13.
+
+| # | Game | One line | To have |
+|---|------|----------|---------|
+| 1 | Arrow Path ✅ | Place arrows to guide the robot to the gem | Done |
+| 2 | **Pattern train** (next) | Spot the pattern and add the next shape, or fill a gap in the middle | Must have |
+| 3 | Word guessing | One player describes the picture word, the others guess. 500+ words, ages 5 to 9 | Must have |
+| 4 | Make 10 | Fill the ten-frame: find the number that makes 10 | Should have |
+| 5 | Frog hops | A frog hops along a number line; find the missing start, hop or landing | Should have |
+| 6 | Science play | Guess what will happen, then watch it happen (sink or float, ramps, balances…) | Should have, design talk first |
+| 7 | Shape sorter | Put everyday objects into the right 3D shape bin | Nice to have |
+| 8 | What's it made of? | Match objects to wood, metal, glass or plastic | Parked |
+| 9 | Feelings faces | Guess how a character feels from a picture (our own characters) | Parked |
+
+Notes for when each is built (starting points, not decisions):
+- **Pattern train:** a ladder from colour (AB), size, turned shapes, ABB and ABC, a gap in the middle, 3D shapes, to
+  two things changing at once. Generated and checked by a solver (D12).
+- **Word guessing:** no forbidden words. A picture (emoji) and 🔊 on every card, so a child who can't read the word
+  can still describe it. The word list ships as one file of the site. Word levels: things you can see, then actions
+  and places, then ideas and feelings. No timer unless the owner asks (an optional one is a question for its idea
+  check). Our own name for it.
+- **Make 10:** a ladder from dots only, dots plus the sum, the number only, the `10 = 3 + _` form, to bonds to other
+  numbers.
+- **Frog hops:** start, hop or landing can be the missing piece (`7 - _ = 5`). Up to 20 at higher levels.
+- **Science play:** the owner wants her to see how things behave in real life; what and how are still open. Ideas:
+  sink or float, ramps and rolling balls, a balance scale, mixing colours, water through pipes, magnets, shadows,
+  melting and freezing. The physics is our own small code, no engine package.
+- **Shape sorter:** ball, tin, box, cone, dice into sphere, cylinder, cuboid, cone, cube; 🔊 says the names. Our own
+  SVG drawings.
 
 **Optional, later: more ways to start work on GitHub.** Today a session can open the issue for you (`CLAUDE.md`,
 "Opening issues for the owner"), so you don't type it and nothing is pushed from the Mac. These go further, if wanted:
@@ -144,14 +176,14 @@ Notes:
   Docker image): 3 of 150 taps on "New!" did nothing, because WebKit lost the "take over" message. The app now
   sends it again every second until the new version takes over (`js/pwa/update.js`). Proven: 300 of 300 passed after
   the fix, and a new test drops the first message on purpose in every browser.
-- Check in step 9 on the real iPad: tapping "⬆️ New!" updates the app every time (the bug above was in Safari's
+- Not tested on a real Apple device (2026-11-28: no iPad or iPhone): tapping "⬆️ New!" updates the app every time (the bug above was in Safari's
   engine).
 - To do in step 6b: the play reviewer runs only when a shipped file changed (`isShipped` in
   `tests/shipped-files.js`); the code reviewer runs on every non-docs PR (D19).
-- Note for step 9: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.
-- Check in step 9 on the real iPad: a first visit shows no "⬆️ New!" banner. In 6a, WebKit on Linux once showed
+- Not tested on a real Apple device: the iPad/iPhone silent switch can mute 🔊. Check it's off when testing speech.
+- Not tested on a real Apple device: a first visit shows no "⬆️ New!" banner. In 6a, WebKit on Linux once showed
   the banner in an unrelated visual test (cause unknown; visual tests now run without the service worker).
-- Check in step 9 on the real iPad: the 3 s holds (home title, Reset) and the seed long-press aren't cancelled by
+- Not tested on a real Apple device: the 3 s holds (home title, Reset) and the seed long-press aren't cancelled by
   iOS. They're tested in Chromium and WebKit with a mouse, but not yet with real touch on iOS.
 - To do in step 6b: the reviewer and fix runs load `CLAUDE.md` and `docs/REVIEW-CHECKLIST.md` from `main`
   (the base branch), not the PR branch, so a PR can't change the rules it's judged by. The action already does

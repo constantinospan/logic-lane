@@ -124,8 +124,11 @@ Big game tiles, tap to play. No profiles, no long-term progress shown.
 
 ### D13. Game backlog
 1. **Arrow path** (first): place arrows to guide a character to the treasure; later levels add loops and debugging.
-2. **Word guessing**: like Taboo but no forbidden words; easy enough for 5–7 year olds. Name TBD.
-3. **What comes next?**: identify/continue the pattern. Name TBD.
+2. **Pattern train** (was "What comes next?"): spot the pattern and add the next shape. Moved up to second
+   (owner, 2026-11-28): the better puzzle to build next.
+3. **Word guessing**: one player describes a word, the others guess; no forbidden words. Words for 5–9 year olds
+   (was 5–7, owner 2026-11-28), a pool of 500+ words if possible. Our own name for it.
+4. The rest, by priority: the "Game ideas" list in `PLAN.md`.
 
 ### D14. Difficulty: one ladder per game, chosen before every game
 - Every game starts with a difficulty picker (shared screen, built once): Easy / Medium / Hard.
