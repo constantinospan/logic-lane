@@ -1,6 +1,8 @@
 """Tests for rule_fix.py, the rule-fix loop's steps without AI. These never start Claude."""
 import json
 import os
+import re
+import shutil
 
 import pytest
 
@@ -345,3 +347,79 @@ def test_copy_marks_a_practice_run(tmp_path):
     res = {"cases": {"b04": {"kind": "bug"}}}
     rf.copy(main, main, "b04", [], res, tmp_path / "c", practice=True)
     assert json.loads((tmp_path / "c/fix-input/task.json").read_text())["practice"] is True
+
+
+# ---------- Writing to the test (case words) ----------
+
+OLD_LINE = "- [ ] Saving goes through the shared storage module."
+# Practice PR #61's line for case b01: it names what b01 plants. The AI review and the judge both passed it.
+PR61 = ("- [ ] Saving goes through the shared storage module (`js/core/storage.js`; games use `api.saveState`). Blocking: any\n"
+        "      other way of keeping data (`localStorage`, `sessionStorage`, cookies, IndexedDB), even with a `logic-lane:` key\n"
+        "      and even if wrapped in try/catch. Also Blocking: anything kept past the 3-hour resume window (scores, streaks,\n"
+        "      bests, unlocks), because there's no long-term progress (D7).")
+GENERAL = ("- [ ] Saving goes through the shared storage module (`js/core/storage.js`; games use `api.saveState`). Blocking:\n"
+           "      any other way of keeping data, and anything kept past the resume window (D7).")
+
+
+def b01_copy(tmp_path, new_line):
+    """The real copy the AI gets for case b01, before and after it swaps the checklist's saving line."""
+    main = ev.git("rev-parse", "HEAD", cwd=ev.REPO_ROOT).strip()
+    before = tmp_path / "before"
+    rf.copy(main, main, "b01", [], {"cases": {"b01": {"kind": "bug"}}}, before)
+    after = tmp_path / "after"
+    shutil.copytree(before, after)
+    checklist = after / "docs" / "REVIEW-CHECKLIST.md"
+    text = checklist.read_text()
+    assert OLD_LINE in text
+    checklist.write_text(text.replace(OLD_LINE, new_line))
+    return before, after
+
+
+def test_pr61s_line_is_refused_for_naming_its_case(tmp_path):
+    before, after = b01_copy(tmp_path, PR61)
+    with pytest.raises(SystemExit, match=r"words from the test case .*\(streak\)"):
+        rf.changes(before, after, tmp_path / "out")
+
+
+def test_a_general_line_for_the_same_case_passes(tmp_path):
+    before, after = b01_copy(tmp_path, GENERAL)
+    (tmp_path / "out").mkdir()
+    assert rf.changes(before, after, tmp_path / "out") == ["docs/REVIEW-CHECKLIST.md"]
+
+
+def small_copy(tmp_path, other_files, new_rule):
+    task = {"pr_title": "Demo: keep the zorbles", "pr_body": "It keeps zorbles and widgets.", "what_was_planted": "x"}
+    before = {**BASE, **other_files, "fix-input/task.json": json.dumps(task),
+              "fix-input/case.diff": "+++ b/games/demo/game.js\n+const quuxKey = 1;\n context fribble\n"}
+    return two(tmp_path, before, {**before, "docs/REVIEW-CHECKLIST.md": "one\ntwo\n" + new_rule})
+
+
+@pytest.mark.parametrize("other_files,new_rule,taken", [
+    ({}, "- Blocking: zorble counters.\n", ["zorble"]),  # from the title, plural folded
+    ({}, "- Blocking: a quuxKey.\n", ["quuxkey"]),  # from what the case's PR added
+    ({}, "- Blocking: a `quuxKey_store` key.\n", ["quuxkey"]),  # a part of a joined word counts too
+    ({}, "- Blocking: fribble.\n", []),  # a context line of the diff isn't what the case added
+    ({"a.md": "zorble", "b.md": "zorbles"}, "- Blocking: zorbles.\n", []),  # 2 other files use it: a normal word
+    ({"a.md": "zorble"}, "- Blocking: zorbles.\n", ["zorble"]),  # 1 other file: still the case's own
+])
+def test_case_words(tmp_path, other_files, new_rule, taken):
+    a, b = small_copy(tmp_path, other_files, new_rule)
+    out = tmp_path / "out"
+    out.mkdir()
+    if taken:
+        with pytest.raises(SystemExit, match=re.escape("(" + ", ".join(taken) + ")")):
+            rf.changes(a, b, out)
+    else:
+        assert rf.changes(a, b, out) == ["docs/REVIEW-CHECKLIST.md"]
+
+
+def test_a_case_word_the_rules_already_use_is_allowed(tmp_path):
+    rules = {**BASE, "docs/REVIEW-CHECKLIST.md": "one\ntwo widget\n"}
+    case = {"fix-input/task.json": json.dumps({"pr_body": "widgets"}), "fix-input/case.diff": ""}
+    a, b = two(tmp_path, {**rules, **case}, {**rules, **case, "docs/REVIEW-CHECKLIST.md": "one\ntwo widget\nwidgets!\n"})
+    (tmp_path / "out").mkdir()
+    assert rf.changes(a, b, tmp_path / "out") == ["docs/REVIEW-CHECKLIST.md"]
+
+
+def test_no_case_in_the_copy_means_no_case_word_check(tmp_path):
+    assert rf.case_words(tmp_path, "zorbles everywhere") == []

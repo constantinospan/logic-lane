@@ -5,6 +5,7 @@ Python's built-in library only.
     python3 rule_fix.py judge --pr P/results.json --main M/results.json --case b04  did the try look better?
     python3 rule_fix.py copy --ref SHA --main SHA --case b04 --details D.json --out DIR [--failed REASONS]
     python3 rule_fix.py changes --before DIR --after DIR --out DIR                  what the AI changed, checked
+                                                                                    (incl. words copied from the case)
     python3 rule_fix.py sanitise < why.md                                           safe text for the PR
 
 The AI only ever gets the folder `copy` makes: no tools/eval/ (so no hidden cases and no answers), no .github/,
@@ -14,6 +15,7 @@ that just the allowed rule files changed.
 from __future__ import annotations
 
 import argparse
+import difflib
 import filecmp
 import io
 import json
@@ -35,6 +37,10 @@ SECRETS = re.compile(r"sk-ant-|gh[pousr]_[A-Za-z0-9]{10,}|ghs_|github_pat_|-----
 LEFT_OUT = ("tools/eval", ".github")  # never in the copy
 # Settings and hooks run next to the token, and the agent's own instructions must be main's: always from main.
 FROM_MAIN = ("CLAUDE.md", "tools/review/prompts/rule-fix.md", *ev.TRUSTED_PATHS)
+# Writing to the test: a word counts as the case's own if it's in the case, not already in the rule files, and in at
+# most this many other files of the copy (D27). Words are compared lower case, without a final "s".
+CASE_WORD_MAX_FILES = 1
+WORD = re.compile(r"[A-Za-z][A-Za-z0-9_:/.-]*[A-Za-z0-9]")
 
 
 # ---------- What an eval keeps (written by ci_eval.py report) ----------
@@ -299,6 +305,10 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
         lines += abs(len(new) - len(old)) + sum(1 for x, y in zip(old, new) if x != y)
         if SECRETS.search(b[rel].read_text(encoding="utf-8")) and not SECRETS.search(a[rel].read_text(encoding="utf-8")):
             problems.append(f"{rel}: looks like it contains a secret")
+    taken = case_words(before, "\n".join(_added(_text(a[rel]), _text(b[rel])) for rel in changed))
+    if taken:
+        problems.append("the new lines use words from the test case that the rules and the rest of the repo don't "
+                        f"use ({', '.join(taken)}): a rule fix must describe the problem, not this case")
     if lines > MAX_CHANGED_LINES:
         problems.append(f"{lines} changed lines (at most {MAX_CHANGED_LINES})")
     if ignored:  # on stderr, so the run log shows them but the list of changed files stays clean
@@ -312,6 +322,55 @@ def changes(before: Path, after: Path, out: Path) -> list[str]:
     text = why.read_text(encoding="utf-8", errors="replace") if why and why.is_file() and not why.is_symlink() else ""
     (out / "why.md").write_text(sanitise(text) or "_The rule-fix run gave no reason._", encoding="utf-8")
     return changed
+
+
+def _words(text: str) -> set[str]:
+    """Each word, and the parts of a joined one (`logic-lane:x-key`, `X_KEY`, `a/b.js`), lower case, no final s."""
+    found = set()
+    for w in WORD.findall(text):
+        found.update(x for x in [w, *re.split(r"[-:/._]+", w)] if len(x) >= 3)
+    return {x.lower().rstrip("s") for x in found}
+
+
+def _added(old: str, new: str) -> str:
+    """The lines of `new` that aren't in `old` (new and changed lines)."""
+    a, b = old.splitlines(), new.splitlines()
+    sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
+    return "\n".join(line for op, _, _, j1, j2 in sm.get_opcodes() if op in ("replace", "insert") for line in b[j1:j2])
+
+
+def case_words(before: Path, added: str) -> list[str]:
+    """Words the AI's new rule lines take from the case it was given: in the case (what its PR added, its title,
+    body and what was planted), new to the rule files, and rare in the rest of the copy. Such a rule names the test
+    instead of the problem. `before` is the copy the AI got; its fix-input/ holds the case. No case, no check."""
+    fin = before / "fix-input"
+    try:
+        task = json.loads((fin / "task.json").read_text(encoding="utf-8"))
+        diff = (fin / "case.diff").read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        return []
+    plus = "\n".join(line for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
+    case = _words("\n".join([plus, str(task.get("pr_title", "")), str(task.get("pr_body", "")),
+                             str(task.get("what_was_planted", ""))]))
+    rules = set().union(*(_words(_text(before / rel)) for rel in ALLOWED))
+    wanted = (_words(added) & case) - rules
+    if not wanted:
+        return []
+    seen: dict[str, int] = dict.fromkeys(wanted, 0)
+    for p in before.rglob("*"):
+        rel = p.relative_to(before)
+        if rel.parts[0] == "fix-input" or str(rel) in ALLOWED or p.is_symlink() or not p.is_file():
+            continue
+        for w in wanted & _words(_text(p)):
+            seen[w] += 1
+    return sorted(w for w, n in seen.items() if n <= CASE_WORD_MAX_FILES)
+
+
+def _text(p: Path) -> str:
+    try:
+        return p.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""  # pictures and other binary files have no words
 
 
 def sanitise(text: str) -> str:
