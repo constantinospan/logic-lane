@@ -19,7 +19,7 @@ gh run view "$RUN_ID" --repo "$REPO" --json conclusion,event,headSha,jobs > "$ou
 # The lines that say how many tests ran, passed or were skipped, so PR claims can be checked against them.
 gh run view "$RUN_ID" --repo "$REPO" --log 2>/dev/null \
   | sed -E 's/\x1b\[[0-9;]*m//g' \
-  | grep -E '[0-9]+ (passed|failed|skipped|flaky|did not run)|Tests +[0-9]+|Test Files +[0-9]+' \
+  | grep -E '[0-9]+ (passed|failed|skipped|flaky|did not run)|Tests +[0-9]+|Test Files +[0-9]+|Test scope: ' \
   | tail -n 80 > "$out/ci-tests.txt" || true
 
 # The agreed brief (D21): the idea check's comments on this PR and on the issues it closes, plus the owner's PR

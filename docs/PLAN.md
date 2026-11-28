@@ -16,7 +16,7 @@ Times are rough. "Me" = the parent/owner, "Claude" = the AI agent.
 | 6c ✅ | Idea gate (D21) | Every request is reviewed by an idea reviewer before any code is written, on GitHub and in sessions. Clear requests are built as usual (with a short brief); unclear ones get questions first. Fixed rules in a tested script, settings in a repo file | Claude | 10 min | 1.5–2 h |
 | 8 ✅ | Arrow path v1 | Puzzle generator + solver, ~30-level ladder, Easy/Medium/Hard starts, loops later in the ladder | Claude | — | 3–5 h |
 | 9 | Playtest | Install on the Android phone and play on the desktop (no tablet or iPhone), play with her, turn feedback into issues | Me | 20 min + play | — |
-| 10 | Test scaling (D20) | **When `main`'s CI passes 2m30s or at the third game:** PRs run only what they could break, shards grow with the tests, a no-cross-game-imports test | Claude | — | 1–2 h |
+| 10 | Test scaling (D20) | PRs run only what they could break, shards grow with the tests, a no-cross-game-imports test. Built 2026-11-28; tick after the GitHub proof | Claude | — | 1–2 h |
 
 ## Game ideas (owner, 2026-11-28)
 

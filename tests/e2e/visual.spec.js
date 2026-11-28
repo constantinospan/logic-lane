@@ -81,13 +81,13 @@ test('play at the top level', async ({ page }) => {
 const ARROW_PATH = { id: 'arrow-path', version: 1, ready: '.ap-grid' };
 for (const [name, level] of /** @type {[string, number][]} */ ([['board', 4], ['moves', 11], ['loops', 14],
   ['debug', 21]])) {
-  test(`arrow path ${name}`, async ({ page }) => {
+  test(`arrow path ${name}`, { tag: '@game:arrow-path' }, async ({ page }) => {
     await openPuzzle(page, level, ARROW_PATH);
     await snap(page, `arrow-path-${name}`);
   });
 }
 
-test('arrow path after a wrong walk', async ({ page }) => {
+test('arrow path after a wrong walk', { tag: '@game:arrow-path' }, async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); // short steps, and no wiggle mid-picture
   await openPuzzle(page, 21, ARROW_PATH); // the list starts wrong, so Go fails straight away
   await page.getByRole('button', { name: 'Go' }).click();
@@ -100,13 +100,13 @@ test('arrow path after a wrong walk', async ({ page }) => {
 const PATTERN_TRAIN = { id: 'pattern-train', version: 1, ready: '.pt-train' };
 for (const [name, level] of /** @type {[string, number][]} */ ([['colour', 1], ['size', 5], ['turn', 9], ['abc', 15],
   ['middle', 17], ['solids', 21], ['two', 29]])) {
-  test(`pattern train ${name}`, async ({ page }) => {
+  test(`pattern train ${name}`, { tag: '@game:pattern-train' }, async ({ page }) => {
     await openPuzzle(page, level, PATTERN_TRAIN);
     await snap(page, `pattern-train-${name}`);
   });
 }
 
-test('pattern train after a mistake', async ({ page }) => {
+test('pattern train after a mistake', { tag: '@game:pattern-train' }, async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); // no wiggle mid-picture
   await openPuzzle(page, 13, PATTERN_TRAIN);
   const p = generate(13, createRng('visual', 13)).puzzle;

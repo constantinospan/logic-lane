@@ -19,6 +19,8 @@ The exact contract, with types, is the `Game` typedef in [`js/core/games.js`](..
    - every generated puzzle is solvable (use a solver);
    - every puzzle stays within that level's difficulty rules.
 
+   Its browser tests are tagged `@game:<id>` (`docs/TESTING.md`), and it never imports another game's files.
+
    `tests/unit/games.test.js` already checks every registered game automatically: the ladder is valid, the
    instruction isn't empty, the same seed gives the same puzzle, and `Math.random` isn't used. See
    `docs/TESTING.md`.

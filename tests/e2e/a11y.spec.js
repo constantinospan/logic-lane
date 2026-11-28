@@ -36,7 +36,7 @@ test('play screen has no accessibility problems', async ({ page }) => {
 });
 
 for (const level of [1, 11, 14, 21]) {
-  test(`Arrow Path level ${level} has no accessibility problems`, async ({ page }) => {
+  test(`Arrow Path level ${level} has no accessibility problems`, { tag: '@game:arrow-path' }, async ({ page }) => {
     await page.goto('./');
     await page.evaluate((lvl) => {
       const save = { gameId: 'arrow-path', gameVersion: 1, level: lvl, n: 0, seed: 'a11y00', state: null,
@@ -56,7 +56,8 @@ for (const level of [1, 11, 14, 21]) {
 }
 
 for (const level of [1, 17, 21, 29]) {
-  test(`Pattern Train level ${level} has no accessibility problems`, async ({ page }) => {
+  test(`Pattern Train level ${level} has no accessibility problems`, { tag: '@game:pattern-train' },
+    async ({ page }) => {
     await page.goto('./');
     await page.evaluate((lvl) => {
       const save = { gameId: 'pattern-train', gameVersion: 1, level: lvl, n: 0, seed: 'a11y00', state: null,
