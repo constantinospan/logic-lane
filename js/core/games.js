@@ -3,6 +3,7 @@
 import { assertValidLadder } from './ladder.js';
 import demo from '../../games/demo/game.js';
 import arrowPath from '../../games/arrow-path/game.js';
+import patternTrain from '../../games/pattern-train/game.js';
 
 /**
  * What a game gets from the shell while a puzzle is on screen.
@@ -39,7 +40,7 @@ import arrowPath from '../../games/arrow-path/game.js';
 export const COMING_SOON = [];
 
 /** @type {Game[]} */
-export const GAMES = [arrowPath, demo];
+export const GAMES = [arrowPath, patternTrain, demo];
 
 for (const game of GAMES) assertValidLadder(game.ladder);
 

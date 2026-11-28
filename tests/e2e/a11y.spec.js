@@ -1,6 +1,8 @@
 // Automated accessibility checks (axe) on every screen: contrast, names for buttons, structure.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, hold, startDemo, tapWrongChoice, test } from './fixtures.js';
+import { generate } from '../../games/pattern-train/generate.js';
+import { createRng } from '../../js/core/rng.js';
 
 /**
  * @param {import('@playwright/test').Page} page
@@ -49,6 +51,24 @@ for (const level of [1, 11, 14, 21]) {
     } else {
       await page.locator('.ap-tap').first().click(); // a square with an arrow
     }
+    expect(await violations(page)).toEqual([]);
+  });
+}
+
+for (const level of [1, 17, 21, 29]) {
+  test(`Pattern Train level ${level} has no accessibility problems`, async ({ page }) => {
+    await page.goto('./');
+    await page.evaluate((lvl) => {
+      const save = { gameId: 'pattern-train', gameVersion: 1, level: lvl, n: 0, seed: 'a11y00', state: null,
+        active: true, savedAt: Date.now() };
+      localStorage.setItem('logic-lane:resume', JSON.stringify(save));
+    }, level);
+    await page.goto('./#/play/pattern-train');
+    await expect(page.locator('.pt-train')).toBeVisible();
+    const p = generate(level, createRng('a11y00', level)).puzzle;
+    await page.locator(`.pt-choice[data-i="${p.answer === 0 ? 1 : 0}"]`).click(); // a wrong one
+    await expect(page.locator('.pt-hint')).not.toHaveText(''); // the hint and a faded choice are on screen
+    await expect(page.locator('.pt-tried')).toHaveCount(1);
     expect(await violations(page)).toEqual([]);
   });
 }

@@ -5,6 +5,8 @@
 // fonts, so the saved pictures match. On other machines (a Mac, claude.ai/code) fonts differ and every picture
 // would fail, so the tests skip there. Pictures change only for an intended visual change: see docs/TESTING.md.
 import { expect, hold, readSave, startDemo, tapRightChoice, test } from './fixtures.js';
+import { generate } from '../../games/pattern-train/generate.js';
+import { createRng } from '../../js/core/rng.js';
 
 // On GitHub every run must include them: a workflow that forgot VISUAL=1 fails here instead of skipping quietly.
 if (process.env.GITHUB_ACTIONS && !process.env.VISUAL) throw new Error('Set VISUAL=1 in the workflow (docs/TESTING.md).');
@@ -92,6 +94,26 @@ test('arrow path after a wrong walk', async ({ page }) => {
   await expect(page.locator('.ap-busy')).toHaveCount(0);
   await expect(page.locator('.ap-hint')).not.toHaveText('');
   await snap(page, 'arrow-path-mistake'); // the hint line, the lit trail and the marked step
+});
+
+// Pattern Train: one picture per step of the ladder (D28), and one after a mistake.
+const PATTERN_TRAIN = { id: 'pattern-train', version: 1, ready: '.pt-train' };
+for (const [name, level] of /** @type {[string, number][]} */ ([['colour', 1], ['size', 5], ['turn', 9], ['abc', 15],
+  ['middle', 17], ['solids', 21], ['two', 29]])) {
+  test(`pattern train ${name}`, async ({ page }) => {
+    await openPuzzle(page, level, PATTERN_TRAIN);
+    await snap(page, `pattern-train-${name}`);
+  });
+}
+
+test('pattern train after a mistake', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' }); // no wiggle mid-picture
+  await openPuzzle(page, 13, PATTERN_TRAIN);
+  const p = generate(13, createRng('visual', 13)).puzzle;
+  await page.locator(`.pt-choice[data-i="${p.answer === 0 ? 1 : 0}"]`).click(); // a wrong one
+  await expect(page.locator('.pt-tried')).toHaveCount(1);
+  await expect(page.locator('.pt-hint')).not.toHaveText('');
+  await snap(page, 'pattern-train-mistake');
 });
 
 test('celebration', async ({ page }) => {

@@ -36,6 +36,13 @@ const PRECACHE = [
   './games/arrow-path/solve.js',
   './games/arrow-path/view.js',
   './games/demo/game.js',
+  './games/pattern-train/draw.js',
+  './games/pattern-train/game.js',
+  './games/pattern-train/generate.js',
+  './games/pattern-train/levels.js',
+  './games/pattern-train/model.js',
+  './games/pattern-train/solve.js',
+  './games/pattern-train/view.js',
 ];
 
 const sw = /** @type {ServiceWorkerGlobalScope} */ (/** @type {unknown} */ (self));

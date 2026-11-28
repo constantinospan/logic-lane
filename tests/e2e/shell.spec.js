@@ -8,6 +8,24 @@ test('home shows the title and game tiles', async ({ page }) => {
   await expect(page.locator('.tile', { hasText: 'Demo' })).toHaveCount(0); // hidden game
 });
 
+test('tile titles stay centred when a long name wraps onto two lines', async ({ page }) => {
+  await page.goto('./');
+  // Narrow tiles, so long names wrap with any font (on GitHub's Linux, "Pattern Train" wraps on a 390 px phone).
+  await page.addStyleTag({ content: '.tiles { grid-template-columns: repeat(auto-fill, 110px); }' });
+  const lines = await page.locator('.tile').evaluateAll((tiles) => tiles.map((tile) => {
+    const title = /** @type {HTMLElement} */ (tile.querySelector('.tile-title'));
+    const range = document.createRange();
+    range.selectNodeContents(title);
+    const t = tile.getBoundingClientRect();
+    const middle = (t.left + t.right) / 2;
+    const rects = [...range.getClientRects()];
+    return { name: title.textContent, lines: new Set(rects.map((r) => Math.round(r.top))).size,
+      offCentre: rects.filter((r) => Math.abs((r.left + r.right) / 2 - middle) > 3).length };
+  }));
+  expect(lines.some((l) => l.lines > 1), 'a title wraps, so this test means something').toBe(true);
+  expect(lines.filter((l) => l.offCentre > 0)).toEqual([]);
+});
+
 test('opening a game with nothing saved goes to its picker', async ({ page }) => {
   await page.goto('./#/play/demo');
   await expect(page).toHaveURL(/#\/game\/demo$/);

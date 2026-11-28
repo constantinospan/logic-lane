@@ -489,3 +489,29 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
 - **Switch:** `AI_RULE_FIX=on` (repo variable), like `AI_EVAL`. Runs by hand work even when it's off.
 - **Quota:** each try is about 40 reviews on the owner's plan (the eval plus the AI review). Tries only happen when
   a miss repeats.
+
+### D28. Pattern Train design (2026-11-28, idea check: build)
+- **The game:** a train of carriages, each carrying a shape. One carriage is empty; she taps the choice that fits.
+  The choice drops into the carriage and the train toots. This follows the idea check's three assumptions: tap one
+  of 3 big choices (4 from level 23); a simple SVG train; about 4 levels per step in the plan's order.
+- **Ladder (30 levels, Easy 1 / Medium 11 / Hard 21):** colour AB (1–4), size AB (5–8), turned shapes (9–12),
+  AAB/ABB then ABC in colour or shape (13–16), a gap in the middle (17–20), 3D shapes (21–24), then two things
+  changing at once: together (25–28), then each with its own pattern, one AB and one ABC (29–30). Trains have 5 to 8
+  carriages, so they fit in one row on a 360 px phone. Up to level 16 the unit starts at the front of the train;
+  from 17 it can start part-way in.
+- **Fair puzzles:** the whole train is built first. A solver that doesn't know how it was made reads it from the
+  screen: for each thing (shape, colour, size, turn), every repeat length shown at least twice must agree on the
+  empty carriage. Then exactly one choice must match. A search of every train up to 8 carriages found none that
+  can be read two ways under this rule.
+- **Wrong choices** are always wrong on something that changes along the train. The hint names what that choice got
+  wrong ("Not that one. Look at the colours."), so it never points at the wrong thing. The tried choice fades but
+  can still be tapped. Nothing is lost.
+- **Pictures:** our own SVG. Flat shapes: circle, square, triangle, star, heart. 3D (levels 21–24): cube, ball,
+  cone, tube, with a light top and a dark side. Only triangles and hearts are turned, because a turn shows on them.
+  Flat and 3D shapes are never mixed in one puzzle.
+- **Colours:** the colour-blind-friendly Okabe–Ito set: orange, blue, yellow, green, pink. Red was dropped because the
+  set's red-orange reads as orange. Every shape has a dark outline.
+- **Colour on its own (an exception to the checklist's "nothing important by colour alone"):** on colour levels the
+  colour is the puzzle itself. The colours are picked so red-green colour blindness can still tell them apart, and
+  every carriage and choice has its colour in its name for screen readers.
+

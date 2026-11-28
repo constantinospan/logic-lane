@@ -205,6 +205,10 @@ button {
   line-height: 1;
 }
 
+.tile-title {
+  text-align: center; /* a long name wraps onto two lines on a phone: keep both lines centred under the picture */
+}
+
 .tile-soon .tile-icon {
   filter: grayscale(1);
   opacity: 0.5; /* fade only the picture; words stay readable (contrast) */
@@ -721,5 +725,181 @@ button {
   .ap-slot.ap-selected {
     animation: none;
     transform: none;
+  }
+}
+
+/* ---------- Pattern Train ---------- */
+
+.pt {
+  --pt-side: var(--gap); /* space between the game and the screen's edge */
+  --pt-link: 3px; /* between carriages (they're looked at, not tapped) */
+  --pt-w: min(100vw - 2 * var(--pt-side), 860px);
+  /* The engine is 0.8 of a carriage wide, so 8 carriages and the engine fit in one row on a 360 px phone. */
+  --car: min(88px, calc((var(--pt-w) - var(--n) * var(--pt-link)) / (var(--n) + 0.8)));
+  /* Choices are tapped: never under 64 px, with 12 px between them. */
+  --choice: max(64px, min(104px, calc((var(--pt-w) - (var(--k) - 1) * 12px) / var(--k))));
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--gap) * 1.5);
+}
+
+@media (max-width: 389px) {
+  .pt {
+    --pt-side: 4px;
+    align-self: stretch;
+    width: auto;
+    margin-inline: calc(var(--pt-side) - var(--gap));
+  }
+}
+
+/* What went wrong, in big simple words. Empty until a mistake; its height is kept so nothing jumps. */
+.pt-hint {
+  margin: 0;
+  min-height: 2.8em;
+  display: flex;
+  align-items: center;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--ink);
+}
+
+.pt-train {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--pt-link);
+  padding-bottom: calc(var(--car) * 0.2); /* room for the wheels */
+}
+
+.pt-done .pt-train {
+  animation: pt-toot 0.9s ease-in-out;
+}
+
+.pt-engine {
+  width: calc(var(--car) * 0.8);
+  height: calc(var(--car) * 1.05);
+  flex: none;
+}
+
+.pt-engine svg,
+.pt-load svg,
+.pt-choice svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A carriage: a box with two wheels under it (drawn with ::before and ::after). */
+.pt-car {
+  position: relative;
+  width: var(--car);
+  height: var(--car);
+  flex: none;
+  padding: calc(var(--car) * 0.05);
+  border: max(2px, calc(var(--car) * 0.04)) solid var(--ink);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.pt-car::before,
+.pt-car::after {
+  content: '';
+  position: absolute;
+  bottom: calc(var(--car) * -0.2);
+  width: calc(var(--car) * 0.22);
+  height: calc(var(--car) * 0.22);
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.pt-car::before {
+  left: 12%;
+}
+
+.pt-car::after {
+  right: 12%;
+}
+
+.pt-load {
+  width: 100%;
+  height: 100%;
+}
+
+/* The empty carriage: dashed, with a big question mark. */
+.pt-gap {
+  border-style: dashed;
+  background: var(--sun);
+}
+
+.pt-gap .pt-load {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--car) * 0.6);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pt-filled .pt-load {
+  animation: pop 0.4s ease-out;
+}
+
+.pt-choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pt-choice {
+  width: var(--choice);
+  height: var(--choice);
+  padding: 10px;
+}
+
+/* A choice she already tried: faded, but still there and still tappable. */
+.pt-choice.pt-tried {
+  opacity: 0.45;
+}
+
+.pt-choice.pt-picked {
+  outline: 4px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.pt-done .pt-choice {
+  pointer-events: none;
+}
+
+/* Sideways phones: less space around the train, so the choices stay on screen without scrolling. */
+@media (max-height: 500px) {
+  .pt {
+    gap: 8px;
+    --choice: max(64px, min(76px, calc((var(--pt-w) - (var(--k) - 1) * 12px) / var(--k))));
+    --car: min(64px, calc((var(--pt-w) - var(--n) * var(--pt-link)) / (var(--n) + 0.8)));
+  }
+
+  .pt-hint {
+    min-height: 1.4em;
+    font-size: 1.1rem;
+  }
+}
+
+@keyframes pt-toot {
+  30% {
+    transform: translateX(-6px) rotate(-1deg);
+  }
+  60% {
+    transform: translateX(4px) rotate(1deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pt-done .pt-train,
+  .pt-filled .pt-load {
+    animation: none;
   }
 }
