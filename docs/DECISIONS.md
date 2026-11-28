@@ -451,6 +451,13 @@ these rules that's about +17 s per game (10 games: about 4.5 min).
   anything is pushed. New empty files are ignored and never pushed (Claude Code's sandbox leaves placeholders
   such as `.env`; first proof run, 2026-11-24). If the AI changes nothing, that's its answer: nothing is pushed,
   and its reason goes into the run's summary.
+- **No writing to the test (owner's choice, 2026-11-28):** the same check refuses a change whose new lines use a
+  word taken from the case (what its PR added, its title, body or what was planted) that the rule files don't use
+  yet and that at most one other file of the AI's copy uses. Such a word names this test, not the problem. Practice
+  PR #61 showed the gap: its new line named what its case plants, and both the AI review and the judge passed it;
+  this check would have refused it. A refused try is used up, like any other refusal: the run goes red and lists
+  the words, and nothing is pushed. A general rule that happens to need a rare word from the case is refused too;
+  the owner can still write that rule by hand. Docs never quote the words it flags (that would make them common).
 - **Practice runs (owner's choice, 2026-11-24):** a by-hand run can be marked practice, for a case main already
   catches. The AI is asked for one small general improvement, so the whole loop (app token, PR, review, eval,
   judge) can be proven while no visible case is missed. Its PR gets the `rule-fix-practice` label and never a

@@ -31,6 +31,8 @@ fails.
    counts, or a line saying this kind of problem is Blocking. Keep the file's style: short, plain English.
 3. **Never write to the test.** No file names, function names, numbers or wording taken from this one test PR.
    There are other test cases you can't see, and a rule that only fits this one makes those worse, so the try fails.
+   A check without AI also refuses your change, before anything is pushed, if a new line uses a word from this
+   test PR that the rules and the rest of the repo hardly use. Describe the kind of problem in the repo's own words.
 4. **Never weaken anything.** Don't remove or soften rules, and don't make the reviewer block things that are fine:
    new false alarms on clean PRs also fail the try.
 5. Rules must agree with `docs/DECISIONS.md`. If the only fix would change a decision, change nothing and say so
