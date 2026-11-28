@@ -72,4 +72,5 @@ and the `@claude` builder do. On a Mac or in claude.ai/code they skip.
 - `tests/serve.mjs` serves the repo at `/logic-lane/`, like GitHub Pages. It has one test hook: a browser with
   the cookie `test-sw-version=<v>` gets `sw.js` with that `VERSION`, as if a new version had been deployed.
   Playwright can't intercept service worker scripts, so this is how the update test works.
-- The real-iPad check (speech, press-and-hold, installing) happens by hand in plan step 9.
+- The real-device check (speech, press-and-hold, installing) happens by hand in plan step 9, on an Android phone
+  and a desktop. There's no iPad or iPhone, so iOS behaviour is not tested on a real device (see the plan's notes).
