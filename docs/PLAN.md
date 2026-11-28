@@ -25,7 +25,7 @@ By priority. Each game gets its own idea check (D21) when it's built. Order of t
 | # | Game | One line | To have |
 |---|------|----------|---------|
 | 1 | Arrow Path ✅ | Place arrows to guide the robot to the gem | Done |
-| 2 | **Pattern train** (next) | Spot the pattern and add the next shape, or fill a gap in the middle | Must have |
+| 2 | **Pattern train** (being built, D28) | Spot the pattern and add the next shape, or fill a gap in the middle | Must have |
 | 3 | Word guessing | One player describes the picture word, the others guess. 500+ words, ages 5 to 9 | Must have |
 | 4 | Make 10 | Fill the ten-frame: find the number that makes 10 | Should have |
 | 5 | Frog hops | A frog hops along a number line; find the missing start, hop or landing | Should have |
@@ -35,8 +35,7 @@ By priority. Each game gets its own idea check (D21) when it's built. Order of t
 | 9 | Feelings faces | Guess how a character feels from a picture (our own characters) | Parked |
 
 Notes for when each is built (starting points, not decisions):
-- **Pattern train:** a ladder from colour (AB), size, turned shapes, ABB and ABC, a gap in the middle, 3D shapes, to
-  two things changing at once. Generated and checked by a solver (D12).
+- **Pattern train:** built as D28 (2026-11-28).
 - **Word guessing:** no forbidden words. A picture (emoji) and 🔊 on every card, so a child who can't read the word
   can still describe it. The word list ships as one file of the site. Word levels: things you can see, then actions
   and places, then ideas and feelings. No timer unless the owner asks (an optional one is a question for its idea
@@ -172,6 +171,10 @@ Notes:
   bigger, and tapped squares stay 64 px on 360–375 px phones (tested at those sizes). Then a polish PR: no lit
   square on an empty Go, and a same-seed test in the game's own tests. CI on `main` after the merge: 2m28s, so
   step 10 is due.
+- Pattern train built (2026-11-28, D28): the second game. Idea check: build, with 3 assumptions (tap a choice, SVG
+  train, about 4 levels per step). Plan reviewed by a fresh agent first (fixed: wrong choices always differ on what
+  changes, hints name the real difference, units start at the front up to level 16, a 360 px phone fits 8
+  carriages). Step 10 (test scaling) is due: CI was 2m28s after Arrow Path.
 - Fixed (2026-11-14): the WebKit "New!" update test failed twice in CI. Reproduced in Linux WebKit (Playwright's
   Docker image): 3 of 150 taps on "New!" did nothing, because WebKit lost the "take over" message. The app now
   sends it again every second until the new version takes over (`js/pwa/update.js`). Proven: 300 of 300 passed after
